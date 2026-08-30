@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zulora Drive - My Storage</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="drive-body">
+    <!-- Top Header Navigation -->
+    <header class="top-nav glass-panel">
+        <div class="nav-left">
+            <button class="icon-btn sidebar-toggle"><i class="fa-solid fa-bars"></i></button>
+            <div class="brand">
+                <img src="https://i.postimg.cc/VL9RBtWh/Elegant-AI-Agency-Logo-for-Zulora-20260208-153446-0000.png" alt="Logo" class="brand-logo">
+                <span class="brand-title">Zulora Drive</span>
+            </div>
+        </div>
+
+        <div class="search-bar-container">
+            <i class="fa-solid fa-magnifying-glass search-icon"></i>
+            <input type="text" id="search-input" placeholder="Search in Drive..." onkeyup="filterFiles()">
+            <button class="icon-btn filter-btn"><i class="fa-solid fa-sliders"></i></button>
+        </div>
+
+        <div class="nav-right">
+            <button class="icon-btn" id="theme-toggle-btn" onclick="toggleDarkMode()"><i class="fa-solid fa-moon"></i></button>
+            <div class="profile-avatar" id="profile-avatar-btn" onclick="toggleProfileModal()">
+                <span id="avatar-initial">S</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Drive Body -->
+    <div class="drive-layout">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar glass-panel">
+            <button class="upload-fab-desktop primary-btn" onclick="triggerFileInput()">
+                <i class="fa-solid fa-plus"></i>
+                <span>New Upload</span>
+            </button>
+            
+            <nav class="sidebar-menu">
+                <a href="#" class="menu-item active" onclick="switchTab('suggested')"><i class="fa-solid fa-house"></i> Home</a>
+                <a href="#" class="menu-item" onclick="switchTab('mydrive')"><i class="fa-solid fa-hard-drive"></i> My Drive</a>
+                <a href="#" class="menu-item" onclick="switchTab('starred')"><i class="fa-solid fa-star"></i> Starred</a>
+                <a href="#" class="menu-item" onclick="switchTab('shared')"><i class="fa-solid fa-user-group"></i> Shared</a>
+                <a href="pricing.html" class="menu-item upgrade-link"><i class="fa-solid fa-gem"></i> Upgrade Storage</a>
+            </nav>
+
+            <div class="storage-widget glass-card">
+                <div class="storage-header">
+                    <i class="fa-solid fa-cloud"></i>
+                    <span>Storage Usage</span>
+                </div>
+                <div class="progress-bar-bg">
+                    <div class="progress-bar-fill" id="storage-progress-fill" style="width: 5%;"></div>
+                </div>
+                <p id="storage-text">0 MB of 10 GB used</p>
+                <a href="pricing.html" class="get-more-btn">Get more storage</a>
+            </div>
+        </aside>
+
+        <!-- Main Content View Area -->
+        <main class="main-content">
+            <!-- Secondary Navigation Header -->
+            <div class="content-header">
+                <div class="tabs-subnav">
+                    <button class="subtab-btn active" onclick="switchTab('suggested')">Suggested</button>
+                    <button class="subtab-btn" onclick="switchTab('activity')">Activity</button>
+                    <button class="subtab-btn" onclick="switchTab('mydrive')">My Drive</button>
+                </div>
+                <div class="view-controls">
+                    <button class="icon-btn active" id="view-list-btn"><i class="fa-solid fa-list"></i></button>
+                    <button class="icon-btn" id="view-grid-btn"><i class="fa-solid fa-border-all"></i></button>
+                </div>
+            </div>
+
+            <!-- Hidden File Input -->
+            <input type="file" id="file-upload-input" multiple style="display: none;" onchange="handleFileUpload(event)">
+
+            <!-- File Storage Container -->
+            <div class="files-container" id="files-list-container">
+                <div class="empty-state">
+                    <i class="fa-solid fa-cloud-arrow-up empty-icon"></i>
+                    <h3>No files uploaded yet</h3>
+                    <p>Click on the '+' button to upload files to your personal vault.</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Floating Action Button (Mobile FAB) -->
+    <button class="fab-mobile primary-btn" onclick="triggerFileInput()">
+        <i class="fa-solid fa-plus"></i>
+    </button>
+
+    <!-- Bottom Navigation Bar for Mobile -->
+    <nav class="bottom-nav glass-panel">
+        <a href="#" class="nav-tab active" onclick="switchTab('suggested')"><i class="fa-solid fa-house"></i><span>Home</span></a>
+        <a href="#" class="nav-tab" onclick="switchTab('starred')"><i class="fa-solid fa-star"></i><span>Starred</span></a>
+        <a href="#" class="nav-tab" onclick="switchTab('shared')"><i class="fa-solid fa-user-group"></i><span>Shared</span></a>
+        <a href="#" class="nav-tab" onclick="switchTab('mydrive')"><i class="fa-solid fa-folder"></i><span>Files</span></a>
+    </nav>
+
+    <!-- User Profile Modal -->
+    <div class="modal-backdrop" id="profile-modal">
+        <div class="modal-card glass-panel">
+            <div class="modal-header">
+                <h4 id="user-display-email">user@zulora.com</h4>
+                <button class="close-btn" onclick="toggleProfileModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="user-info-box">
+                    <div class="big-avatar" id="modal-avatar">S</div>
+                    <div class="user-details">
+                        <h3 id="user-display-name">Shiven Panwar</h3>
+                        <span class="badge" id="admin-role-badge">Free User</span>
+                    </div>
+                </div>
+                <button class="logout-btn" onclick="handleSignOut()"><i class="fa-solid fa-right-from-bracket"></i> Sign Out</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="script.js"></script>
+</body>
+</html>

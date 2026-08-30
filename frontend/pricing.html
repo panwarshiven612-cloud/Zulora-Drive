@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zulora Drive - Upgrade Storage</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="pricing-body">
+    <div class="pricing-container">
+        <div class="pricing-header">
+            <a href="index.html" class="back-link"><i class="fa-solid fa-arrow-left"></i> Back to Drive</a>
+            <h1>Get more storage for your memories</h1>
+            <p>Upgrade your account and store high-resolution photos, documents, and videos safely.</p>
+            
+            <!-- Monthly / Annual Toggle Switch -->
+            <div class="toggle-container">
+                <span class="toggle-label active" id="monthly-label">Monthly</span>
+                <label class="switch">
+                    <input type="checkbox" id="billing-toggle" onchange="toggleBillingCycle()">
+                    <span class="slider round"></span>
+                </label>
+                <span class="toggle-label" id="annual-label">Annual <span class="save-badge">Save 16%</span></span>
+            </div>
+        </div>
+
+        <div class="plans-grid">
+            <!-- 50 GB Plan -->
+            <div class="plan-card glass-panel">
+                <div class="plan-badge">Lite Tier</div>
+                <h2>50 GB</h2>
+                <div class="price-box">
+                    <span class="price" id="price-50">₹70</span>
+                    <span class="duration" id="dur-50">/ month</span>
+                </div>
+                <ul class="features-list">
+                    <li><i class="fa-solid fa-check"></i> 50 GB Secure Storage</li>
+                    <li><i class="fa-solid fa-check"></i> Access Anywhere 24/7</li>
+                    <li><i class="fa-solid fa-check"></i> Direct WhatsApp Verification</li>
+                </ul>
+                <button class="primary-btn btn-block" onclick="openPaymentModal('50GB', '70')">Upgrade Plan</button>
+            </div>
+
+            <!-- 100 GB Plan (Popular) -->
+            <div class="plan-card glass-panel popular">
+                <div class="popular-tag">Most Popular</div>
+                <div class="plan-badge">Basic Tier</div>
+                <h2>100 GB</h2>
+                <div class="price-box">
+                    <span class="price" id="price-100">₹140</span>
+                    <span class="duration" id="dur-100">/ month</span>
+                </div>
+                <ul class="features-list">
+                    <li><i class="fa-solid fa-check"></i> 100 GB Secure Storage</li>
+                    <li><i class="fa-solid fa-check"></i> Enterprise High Speed</li>
+                    <li><i class="fa-solid fa-check"></i> Priority Admin Approval</li>
+                </ul>
+                <button class="primary-btn btn-block" onclick="openPaymentModal('100GB', '140')">Upgrade Plan</button>
+            </div>
+
+            <!-- 200 GB Plan -->
+            <div class="plan-card glass-panel">
+                <div class="plan-badge">Standard Tier</div>
+                <h2>200 GB</h2>
+                <div class="price-box">
+                    <span class="price" id="price-200">₹240</span>
+                    <span class="duration" id="dur-200">/ month</span>
+                </div>
+                <ul class="features-list">
+                    <li><i class="fa-solid fa-check"></i> 200 GB Secure Storage</li>
+                    <li><i class="fa-solid fa-check"></i> Multi-Device Syncing</li>
+                    <li><i class="fa-solid fa-check"></i> Unlimited File Sharing</li>
+                </ul>
+                <button class="primary-btn btn-block" onclick="openPaymentModal('200GB', '240')">Upgrade Plan</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Payment & UPI Verification Modal -->
+    <div class="modal-backdrop" id="payment-modal">
+        <div class="modal-card glass-panel">
+            <div class="modal-header">
+                <h3>Payment Verification</h3>
+                <button class="close-btn" onclick="closePaymentModal()">&times;</button>
+            </div>
+            <div class="modal-body text-center">
+                <p>Pay the amount to the official UPI ID below:</p>
+                <div class="upi-box">
+                    <span id="upi-id-text">shivenpanwar@fam</span>
+                    <button class="copy-btn" onclick="copyUPI()"><i class="fa-solid fa-copy"></i> Copy</button>
+                </div>
+                <p class="pay-note">After completing payment on FamPay/GPay/PhonePe, send the transaction screenshot on WhatsApp for instant activation.</p>
+                <button class="whatsapp-btn btn-block" onclick="redirectToWhatsApp()">
+                    <i class="fa-brands fa-whatsapp"></i> Confirm on WhatsApp (+91 6395211325)
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="script.js"></script>
+</body>
+</html>
