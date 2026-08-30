@@ -3,101 +3,274 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Zulora Drive - Upgrade Storage</title>
+    <meta name="description" content="Zulora Drive Pricing Plans - Upgrade your Enterprise Cloud Storage with High-Speed Access">
+    <meta name="author" content="Shiven Panwar">
+    <title>Upgrade Storage Plans - Zulora Drive Enterprise</title>
+
+    <!-- Google Fonts & FontAwesome Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <!-- Main CSS -->
     <link rel="stylesheet" href="style.css">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
 </head>
-<body class="pricing-body">
-    <div class="pricing-container">
-        <div class="pricing-header">
-            <a href="index.html" class="back-link"><i class="fa-solid fa-arrow-left"></i> Back to Drive</a>
-            <h1>Get more storage for your memories</h1>
-            <p>Upgrade your account and store high-resolution photos, documents, and videos safely.</p>
+<body class="pricing-page-body">
+
+    <!-- TOP NAVIGATION BAR -->
+    <header class="pricing-navbar glass-card">
+        <div class="pricing-nav-container">
+            <div class="brand-header">
+                <div class="brand-logo-wrapper">
+                    <i class="fas fa-cloud-meatball brand-icon text-azure"></i>
+                    <div class="brand-text">
+                        <h2>Zulora <span>Drive</span></h2>
+                        <span class="badge-tag">PRICING</span>
+                    </div>
+                </div>
+            </div>
+
+            <nav class="pricing-nav-actions">
+                <a href="index.html" class="btn btn-outline btn-sm">
+                    <i class="fas fa-arrow-left"></i> Back to Dashboard
+                </a>
+                <a href="https://wa.me/916395211325" target="_blank" class="btn btn-primary btn-sm btn-whatsapp">
+                    <i class="fab fa-whatsapp"></i> Instant Support
+                </a>
+            </nav>
+        </div>
+    </header>
+
+    <!-- PRICING HERO SECTION -->
+    <main class="pricing-main-wrapper">
+        
+        <section class="pricing-hero">
+            <span class="hero-badge-pill"><i class="fas fa-sparkles"></i> Simple & Transparent Pricing</span>
+            <h1 class="hero-title">Choose the Perfect Cloud Storage Plan</h1>
+            <p class="hero-subtitle">Expand your digital workspace with high-performance cloud storage, instant file encryption, and priority WhatsApp billing support.</p>
             
-            <!-- Monthly / Annual Toggle Switch -->
-            <div class="toggle-container">
-                <span class="toggle-label active" id="monthly-label">Monthly</span>
+            <!-- Billing Cycle Toggle (Monthly vs Annual) -->
+            <div class="billing-toggle-wrapper glass-card">
+                <span class="toggle-label active" id="labelMonthly">Monthly Billing</span>
                 <label class="switch">
-                    <input type="checkbox" id="billing-toggle" onchange="toggleBillingCycle()">
+                    <input type="checkbox" id="billingCycleToggle">
                     <span class="slider round"></span>
                 </label>
-                <span class="toggle-label" id="annual-label">Annual <span class="save-badge">Save 16%</span></span>
+                <span class="toggle-label" id="labelAnnual">Annual Billing <span class="discount-badge">Save 20%</span></span>
+            </div>
+        </section>
+
+        <!-- PRICING CARDS CONTAINER -->
+        <section class="pricing-cards-section">
+            <div class="pricing-grid">
+
+                <!-- PLAN 1: STARTER FREE PLAN -->
+                <div class="pricing-card glass-card">
+                    <div class="card-header">
+                        <div class="plan-icon text-azure"><i class="fas fa-hard-drive"></i></div>
+                        <h3 class="plan-title">Starter</h3>
+                        <p class="plan-description">Essential cloud storage for everyday personal documents and files.</p>
+                    </div>
+
+                    <div class="card-pricing">
+                        <div class="price-amount">₹0</div>
+                        <span class="price-period">Forever Free</span>
+                    </div>
+
+                    <div class="card-features">
+                        <span class="features-title">PLAN INCLUDES:</span>
+                        <ul>
+                            <li><i class="fas fa-check text-azure"></i> <strong>5 GB</strong> High-Speed Storage</li>
+                            <li><i class="fas fa-check text-azure"></i> Maximum 500 MB Single File Limit</li>
+                            <li><i class="fas fa-check text-azure"></i> Standard File Search & Filtering</li>
+                            <li><i class="fas fa-check text-azure"></i> Firebase Authentication & Security</li>
+                            <li><i class="fas fa-check text-azure"></i> Web & Mobile Browser Access</li>
+                            <li class="disabled"><i class="fas fa-xmark"></i> Priority WhatsApp Support</li>
+                            <li class="disabled"><i class="fas fa-xmark"></i> Advanced Analytics & Backup Logs</li>
+                        </ul>
+                    </div>
+
+                    <div class="card-action">
+                        <button class="btn btn-outline btn-block" disabled>Current Active Plan</button>
+                    </div>
+                </div>
+
+                <!-- PLAN 2: PRO TIER (MOST POPULAR) -->
+                <div class="pricing-card glass-card popular-plan">
+                    <div class="popular-badge"><i class="fas fa-crown"></i> MOST POPULAR</div>
+
+                    <div class="card-header">
+                        <div class="plan-icon text-azure"><i class="fas fa-bolt"></i></div>
+                        <h3 class="plan-title">Pro Drive</h3>
+                        <p class="plan-description">Expanded storage for creators, developers, and heavy file users.</p>
+                    </div>
+
+                    <div class="card-pricing">
+                        <div class="price-amount" id="proPriceText">₹99</div>
+                        <span class="price-period" id="proPeriodText">/ month</span>
+                    </div>
+
+                    <div class="card-features">
+                        <span class="features-title">EVERYTHING IN STARTER PLUS:</span>
+                        <ul>
+                            <li><i class="fas fa-check text-azure"></i> <strong>100 GB</strong> High-Speed Cloud Storage</li>
+                            <li><i class="fas fa-check text-azure"></i> 2 GB Single File Upload Limit</li>
+                            <li><i class="fas fa-check text-azure"></i> Realtime Storage Sync Across Devices</li>
+                            <li><i class="fas fa-check text-azure"></i> Instant File Sharing & Starred Folder</li>
+                            <li><i class="fas fa-check text-azure"></i> <strong>Priority WhatsApp Support</strong> (+91 6395211325)</li>
+                            <li><i class="fas fa-check text-azure"></i> Direct Admin Storage Allocation</li>
+                            <li><i class="fas fa-check text-azure"></i> Zero Ad Tracking</li>
+                        </ul>
+                    </div>
+
+                    <div class="card-action">
+                        <a href="upi://pay?pa=shivenpanwar@fam&pn=Zulora%20Drive&tn=Pro%20100GB%20Upgrade&am=99" class="btn btn-primary btn-block btn-lg" id="proPayBtn">
+                            <i class="fas fa-qrcode"></i> Pay via UPI (₹99)
+                        </a>
+                        <a href="https://wa.me/916395211325?text=Hi%20Shiven%2C%20I%20have%20paid%20%E2%82%B999%20for%20the%20Pro%20100GB%20Plan.%20Please%20verify%20and%20upgrade%20my%20storage." target="_blank" class="verify-whatsapp-link">
+                            <i class="fab fa-whatsapp"></i> Send Payment Screenshot to Admin
+                        </a>
+                    </div>
+                </div>
+
+                <!-- PLAN 3: ENTERPRISE / CUSTOM -->
+                <div class="pricing-card glass-card">
+                    <div class="card-header">
+                        <div class="plan-icon text-azure"><i class="fas fa-building"></i></div>
+                        <h3 class="plan-title">Enterprise</h3>
+                        <p class="plan-description">Custom storage quota for teams, organizations, and power users.</p>
+                    </div>
+
+                    <div class="card-pricing">
+                        <div class="price-amount">Custom</div>
+                        <span class="price-period">Contact for Quote</span>
+                    </div>
+
+                    <div class="card-features">
+                        <span class="features-title">EVERYTHING IN PRO PLUS:</span>
+                        <ul>
+                            <li><i class="fas fa-check text-azure"></i> <strong>500 GB to 2 TB+</strong> Storage Limit</li>
+                            <li><i class="fas fa-check text-azure"></i> Unlimited File Size Uploads</li>
+                            <li><i class="fas fa-check text-azure"></i> Custom Subdomain & Enterprise Branding</li>
+                            <li><i class="fas fa-check text-azure"></i> 24/7 Direct Call & WhatsApp Support</li>
+                            <li><i class="fas fa-check text-azure"></i> Automated Firestore Database Audits</li>
+                            <li><i class="fas fa-check text-azure"></i> Dedicated Server Partitioning</li>
+                        </ul>
+                    </div>
+
+                    <div class="card-action">
+                        <a href="https://wa.me/916395211325?text=Hi%20Shiven%2C%20I%20want%20to%20discuss%20the%20Enterprise%20Custom%20Plan%20for%20Zulora%20Drive." target="_blank" class="btn btn-outline btn-block">
+                            <i class="fas fa-comments"></i> Contact Founder Direct
+                        </a>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- PAYMENT DETAILS INSTRUCTION CONTAINER -->
+        <section class="payment-instructions-section">
+            <div class="instructions-card glass-card">
+                <div class="instructions-header">
+                    <i class="fas fa-shield-halved text-azure fa-2x"></i>
+                    <div>
+                        <h2>How Upgrading Works</h2>
+                        <p>Complete your upgrade in 3 easy steps with manual admin verification.</p>
+                    </div>
+                </div>
+
+                <div class="steps-grid">
+                    <div class="step-item">
+                        <div class="step-number">1</div>
+                        <h4>Make Payment</h4>
+                        <p>Click "Pay via UPI" or send money directly to UPI ID: <strong class="code-text">shivenpanwar@fam</strong> via PhonePe, GPay, or Paytm.</p>
+                    </div>
+
+                    <div class="step-item">
+                        <div class="step-number">2</div>
+                        <h4>Share Screenshot</h4>
+                        <p>Send your payment receipt & registered Email ID to our WhatsApp helpline: <strong class="code-text">+91 6395211325</strong>.</p>
+                    </div>
+
+                    <div class="step-item">
+                        <div class="step-number">3</div>
+                        <h4>Storage Activated</h4>
+                        <p>Our admin instantly verifies your transaction and upgrades your Firestore database storage quota.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- FREQUENTLY ASKED QUESTIONS (FAQ) -->
+        <section class="pricing-faq-section">
+            <h2 class="faq-section-title">Frequently Asked Questions</h2>
+            
+            <div class="faq-container glass-card">
+                
+                <div class="faq-item">
+                    <button class="faq-question">
+                        <span>How quickly is my storage upgraded after payment?</span>
+                        <i class="fas fa-chevron-down faq-icon"></i>
+                    </button>
+                    <div class="faq-answer">
+                        <p>Once you share your UPI transaction receipt on our official WhatsApp helpline (+91 6395211325), your account quota is upgraded within 5 to 15 minutes.</p>
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <button class="faq-question">
+                        <span>What payment methods are supported?</span>
+                        <i class="fas fa-chevron-down faq-icon"></i>
+                    </button>
+                    <div class="faq-answer">
+                        <p>We support all standard Indian UPI apps including FamPay, PhonePe, Google Pay, Paytm, and CRED using the official ID <strong>shivenpanwar@fam</strong>.</p>
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <button class="faq-question">
+                        <span>What happens if I exceed my current storage limit?</span>
+                        <i class="fas fa-chevron-down faq-icon"></i>
+                    </button>
+                    <div class="faq-answer">
+                        <p>Our server will securely prevent new uploads and show a storage warning banner while keeping your existing files completely safe. You can upgrade to a higher tier anytime to continue uploading.</p>
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <button class="faq-question">
+                        <span>Can I cancel my subscription anytime?</span>
+                        <i class="fas fa-chevron-down faq-icon"></i>
+                    </button>
+                    <div class="faq-answer">
+                        <p>Yes, there are no long-term contracts. You can switch back to the free tier anytime by notifying admin support.</p>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+    </main>
+
+    <!-- FOOTER SECTION -->
+    <footer class="pricing-footer glass-card">
+        <div class="footer-container">
+            <div class="footer-brand">
+                <h3>Zulora Drive Enterprise</h3>
+                <p>Architected by <strong>Shiven Panwar</strong> (Founder & CEO, Zulora AI).</p>
+            </div>
+            <div class="footer-contact-details">
+                <p><i class="fas fa-phone text-azure"></i> Helpline: +91 6395211325</p>
+                <p><i class="fas fa-envelope text-azure"></i> Email: shivenpanwar412@gmail.com</p>
             </div>
         </div>
-
-        <div class="plans-grid">
-            <!-- 50 GB Plan -->
-            <div class="plan-card glass-panel">
-                <div class="plan-badge">Lite Tier</div>
-                <h2>50 GB</h2>
-                <div class="price-box">
-                    <span class="price" id="price-50">₹70</span>
-                    <span class="duration" id="dur-50">/ month</span>
-                </div>
-                <ul class="features-list">
-                    <li><i class="fa-solid fa-check"></i> 50 GB Secure Storage</li>
-                    <li><i class="fa-solid fa-check"></i> Access Anywhere 24/7</li>
-                    <li><i class="fa-solid fa-check"></i> Direct WhatsApp Verification</li>
-                </ul>
-                <button class="primary-btn btn-block" onclick="openPaymentModal('50GB', '70')">Upgrade Plan</button>
-            </div>
-
-            <!-- 100 GB Plan (Popular) -->
-            <div class="plan-card glass-panel popular">
-                <div class="popular-tag">Most Popular</div>
-                <div class="plan-badge">Basic Tier</div>
-                <h2>100 GB</h2>
-                <div class="price-box">
-                    <span class="price" id="price-100">₹140</span>
-                    <span class="duration" id="dur-100">/ month</span>
-                </div>
-                <ul class="features-list">
-                    <li><i class="fa-solid fa-check"></i> 100 GB Secure Storage</li>
-                    <li><i class="fa-solid fa-check"></i> Enterprise High Speed</li>
-                    <li><i class="fa-solid fa-check"></i> Priority Admin Approval</li>
-                </ul>
-                <button class="primary-btn btn-block" onclick="openPaymentModal('100GB', '140')">Upgrade Plan</button>
-            </div>
-
-            <!-- 200 GB Plan -->
-            <div class="plan-card glass-panel">
-                <div class="plan-badge">Standard Tier</div>
-                <h2>200 GB</h2>
-                <div class="price-box">
-                    <span class="price" id="price-200">₹240</span>
-                    <span class="duration" id="dur-200">/ month</span>
-                </div>
-                <ul class="features-list">
-                    <li><i class="fa-solid fa-check"></i> 200 GB Secure Storage</li>
-                    <li><i class="fa-solid fa-check"></i> Multi-Device Syncing</li>
-                    <li><i class="fa-solid fa-check"></i> Unlimited File Sharing</li>
-                </ul>
-                <button class="primary-btn btn-block" onclick="openPaymentModal('200GB', '240')">Upgrade Plan</button>
-            </div>
+        <div class="footer-bottom">
+            <p>© 2026 Zulora AI. All Rights Reserved.</p>
         </div>
-    </div>
+    </footer>
 
-    <!-- Payment & UPI Verification Modal -->
-    <div class="modal-backdrop" id="payment-modal">
-        <div class="modal-card glass-panel">
-            <div class="modal-header">
-                <h3>Payment Verification</h3>
-                <button class="close-btn" onclick="closePaymentModal()">&times;</button>
-            </div>
-            <div class="modal-body text-center">
-                <p>Pay the amount to the official UPI ID below:</p>
-                <div class="upi-box">
-                    <span id="upi-id-text">shivenpanwar@fam</span>
-                    <button class="copy-btn" onclick="copyUPI()"><i class="fa-solid fa-copy"></i> Copy</button>
-                </div>
-                <p class="pay-note">After completing payment on FamPay/GPay/PhonePe, send the transaction screenshot on WhatsApp for instant activation.</p>
-                <button class="whatsapp-btn btn-block" onclick="redirectToWhatsApp()">
-                    <i class="fa-brands fa-whatsapp"></i> Confirm on WhatsApp (+91 6395211325)
-                </button>
-            </div>
-        </div>
-    </div>
-
+    <!-- INTERACTIVE PRICING SCRIPT INTEGRATION -->
     <script type="module" src="script.js"></script>
 </body>
 </html>

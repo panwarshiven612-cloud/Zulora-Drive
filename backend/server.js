@@ -37,19 +37,20 @@ app.use(morgan('dev'));
 // ----------------------------------------------------------------------
 // Bhai, production ke liye 'firebase-adminsdk.json' download karke rakhna
 // Firebase Console -> Project Settings -> Service Accounts -> Generate New Private Key
+let db = null;
+
 try {
     const serviceAccount = require('./firebase-adminsdk.json'); // Path to your key
     admin.initializeApp({
         credential: admin.credential.cert(serviceAccount),
         storageBucket: "zulora-drive.firebasestorage.app"
     });
+    db = admin.firestore();
     console.log("🔥 Firebase Admin SDK Initialized Successfully!");
 } catch (error) {
     console.warn("⚠️ Warning: Firebase Admin key missing! Running in local mock mode for UI testing.");
-    // Dummy initialization for UI testing if key is missing
+    db = null;
 }
-
-const db = admin.firestore ? admin.firestore() : null;
 
 // ----------------------------------------------------------------------
 // 3. FILE UPLOAD CONFIGURATION (MULTER)
@@ -87,7 +88,7 @@ const verifyToken = async (req, res, next) => {
     }
     const token = bearerHeader.split(' ')[1];
     try {
-        if (db) {
+        if (db && admin.apps.length > 0) {
             const decodedToken = await admin.auth().verifyIdToken(token);
             req.user = decodedToken;
         } else {
