@@ -5,3 +5,5 @@ uploads/
 backend/serviceAccountKey.json
 backend/serviceAccountKet.json
 serviceAccountKey.json
+**/serviceAccount*.json
+**/firebase-adminsdk*.json

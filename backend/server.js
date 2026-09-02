@@ -117,7 +117,7 @@ function planFromKey(key) {
 }
 
 // Firebase Admin is deliberately required for authenticated API endpoints.
-// Set FIREBASE_SERVICE_ACCOUNT_JSON or place firebase-adminsdk.json beside this file.
+// Set FIREBASE_SERVICE_ACCOUNT_JSON or place a service-account JSON beside this file.
 let db;
 let firebaseReady = false;
 try {
@@ -125,15 +125,21 @@ try {
   if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
     credential = cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON));
   } else {
-    const keyFile = path.join(__dirname, 'firebase-adminsdk.json');
-    if (fs.existsSync(keyFile)) credential = cert(require(keyFile));
-    else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) credential = applicationDefault();
+    const keyFileName = fs.readdirSync(__dirname).find((fileName) => {
+      const lowerName = fileName.toLowerCase();
+      return lowerName.endsWith('.json') &&
+        (lowerName.includes('serviceaccount') || lowerName.includes('firebase-adminsdk'));
+    });
+    if (keyFileName) {
+      const keyFile = path.join(__dirname, keyFileName);
+      credential = cert(require(keyFile));
+    } else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) credential = applicationDefault();
   }
   if (!credential) throw new Error('No Firebase Admin credential was configured.');
   if (!getApps().length) initializeApp({ credential, storageBucket: 'zulora-drive.firebasestorage.app' });
   db = getFirestore();
   firebaseReady = true;
-  console.info('Firebase Admin initialized.');
+  console.info('Firebase Admin Initialized Successfully!');
 } catch (error) {
   console.warn(`Firebase Admin unavailable: ${error.message}`);
 }
