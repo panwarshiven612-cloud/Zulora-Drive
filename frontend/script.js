@@ -25,7 +25,7 @@ googleProvider.setCustomParameters({ prompt: 'select_account' });
 
 const API_BASE = String(
   window.ZULORA_API_BASE_URL || document.querySelector('meta[name="zulora-api-base"]')?.content ||
-  (window.location.protocol === 'file:' ? 'http://localhost:5000' : window.location.origin)
+  (window.location.protocol === 'file:' ? 'https://breezy-bushes-work.loca.lt' : window.location.origin)
 ).replace(/\/$/, '');
 const PLANS = {
   starter: { label: 'Starter', amount: 0, storage: 10 },
