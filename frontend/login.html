@@ -1,134 +1,37 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Zulora Drive - Enterprise Authentication Portal">
-    <meta name="author" content="Shiven Panwar">
-    <title>Sign In - Zulora Drive Enterprise</title>
-
-    <!-- Google Fonts & FontAwesome Icons -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-
-    <!-- Primary Stylesheet -->
-    <link rel="stylesheet" href="style.css">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Sign in securely to Zulora Drive.">
+  <title>Sign in · Zulora Drive</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
+  <link rel="stylesheet" href="style.css">
 </head>
-<body class="auth-page-body">
-
-    <!-- MAIN AUTHENTICATION CONTAINER -->
-    <main class="auth-wrapper">
-        
-        <!-- GLASS CARD CONTAINER -->
-        <div class="auth-card glass-card">
-            
-            <!-- BRAND HEADER LOGO -->
-            <div class="auth-brand">
-                <div class="brand-logo-icon">
-                    <i class="fas fa-cloud-meatball text-azure"></i>
-                </div>
-                <h1 class="brand-title">Zulora <span>Drive</span></h1>
-                <span class="brand-badge">ENTERPRISE CLOUD</span>
-            </div>
-
-            <!-- WELCOME HEADER -->
-            <div class="auth-header-text">
-                <h2>Welcome Back, Bhai! ✌️</h2>
-                <p>Access your high-speed cloud workspace & secure storage.</p>
-            </div>
-
-            <!-- ALERT NOTIFICATION BANNER -->
-            <div class="auth-alert-banner" id="authAlert" style="display: none;">
-                <i class="fas fa-circle-exclamation alert-icon"></i>
-                <span class="alert-text" id="authAlertText">Invalid credentials provided.</span>
-            </div>
-
-            <!-- LOGIN FORM -->
-            <form id="authLoginForm" class="auth-form" autocomplete="on">
-                
-                <!-- EMAIL FIELD -->
-                <div class="form-group-field">
-                    <label for="loginEmail" class="form-label">
-                        <i class="fas fa-envelope"></i> Email Address
-                    </label>
-                    <div class="input-wrapper">
-                        <input 
-                            type="email" 
-                            id="loginEmail" 
-                            class="form-input" 
-                            placeholder="shiven@zulora.ai" 
-                            required 
-                            autocomplete="email"
-                        />
-                        <i class="fas fa-check input-valid-icon"></i>
-                    </div>
-                </div>
-
-                <!-- PASSWORD FIELD -->
-                <div class="form-group-field">
-                    <div class="label-row">
-                        <label for="loginPassword" class="form-label">
-                            <i class="fas fa-lock"></i> Password
-                        </label>
-                        <a href="https://wa.me/916395211325?text=Hi%20Shiven%2C%20I%20forgot%20my%20Zulora%20Drive%20password" class="forgot-link" target="_blank">Forgot Password?</a>
-                    </div>
-                    <div class="input-wrapper">
-                        <input 
-                            type="password" 
-                            id="loginPassword" 
-                            class="form-input" 
-                            placeholder="••••••••••••" 
-                            required 
-                            autocomplete="current-password"
-                        />
-                        <button type="button" class="password-toggle-btn" id="togglePasswordBtn" aria-label="Toggle Password Visibility">
-                            <i class="fas fa-eye" id="togglePasswordIcon"></i>
-                        </button>
-                    </div>
-                </div>
-
-                <!-- REMEMBER ME CHECKBOX -->
-                <div class="form-options-row">
-                    <label class="custom-checkbox-container">
-                        <input type="checkbox" id="rememberMeCheckbox" checked>
-                        <span class="checkmark"></span>
-                        <span class="checkbox-text">Keep me signed in</span>
-                    </label>
-                </div>
-
-                <!-- SUBMIT BUTTON -->
-                <button type="submit" class="btn btn-primary btn-block btn-lg" id="loginSubmitBtn">
-                    <span id="btnText"><i class="fas fa-right-to-bracket"></i> Sign In to Drive</span>
-                    <span id="btnSpinner" class="spinner-inline" style="display: none;">
-                        <i class="fas fa-spinner fa-spin"></i> Authenticating...
-                    </span>
-                </button>
-            </form>
-
-            <div class="auth-divider">
-                <span>OR CONTINUING WITH SUPPORT</span>
-            </div>
-
-            <!-- HELPLINE SUPPORT ACTION -->
-            <div class="auth-footer-actions">
-                <a href="https://wa.me/916395211325" target="_blank" class="btn btn-outline btn-block btn-whatsapp">
-                    <i class="fab fa-whatsapp"></i> Contact Official Helpline (+91 6395211325)
-                </a>
-            </div>
-
-            <!-- SYSTEM FOOTER INFO -->
-            <footer class="auth-card-footer">
-                <p>Powered by <strong>Zulora AI Platform</strong></p>
-                <p class="admin-contact">Official Admin: <a href="mailto:shivenpanwar412@gmail.com">shivenpanwar412@gmail.com</a></p>
-            </footer>
-
-        </div>
-
-    </main>
-
-    <!-- FIREBASE & CORE AUTH LOGIC SCRIPT INTEGRATION -->
-    <script type="module" src="script.js"></script>
+<body data-page="login">
+  <main class="auth-shell">
+    <section class="auth-card glass" aria-labelledby="login-title">
+      <a class="brand" href="index.html" aria-label="Zulora Drive home">
+        <img src="https://i.postimg.cc/VL9RBtWh/Elegant-AI-Agency-Logo-for-Zulora-20260208-153446-0000.png" alt="Zulora logo">
+        <span>Zulora Drive<small>PRIVATE CLOUD STORAGE</small></span>
+      </a>
+      <p class="eyebrow">Secure workspace</p>
+      <h1 id="login-title">Your files, always within reach.</h1>
+      <p>Sign in with Google to create or open your private Zulora Drive. New accounts receive 10 GB free storage automatically.</p>
+      <button id="googleSignInButton" class="button google-button wide" type="button">
+        <span class="google-mark" aria-hidden="true"><i class="fa-brands fa-google"></i></span>
+        Continue with Google
+      </button>
+      <p id="authMessage" class="status-message" role="alert" aria-live="polite"></p>
+      <div class="security-note">
+        <i class="fa-solid fa-shield-halved" aria-hidden="true"></i>
+        <span>Each request is verified with your Firebase session. Files are never made public by the drive server.</span>
+      </div>
+    </section>
+  </main>
+  <script type="module" src="script.js"></script>
 </body>
 </html>

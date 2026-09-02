@@ -1,330 +1,504 @@
-/**
- * ZULORA DRIVE - ENTERPRISE BACKEND SERVER
- * Developed by: Shiven Panwar (CEO, Zulora AI)
- * Architecture: REST API with Express, Firebase Admin, and Multer
- */
+'use strict';
 
+/**
+ * Zulora Drive API
+ * Firebase Authentication establishes identity; Firestore stores metadata and
+ * quotas; the local uploads/<firebase uid> tree stores file bytes. Uploads are
+ * intentionally never exposed as a public static directory.
+ */
+require('dotenv').config();
+
+const crypto = require('crypto');
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const multer = require('multer');
-const admin = require('firebase-admin');
-const path = require('path');
+const { applicationDefault, cert, getApps, initializeApp } = require('firebase-admin/app');
+const { getAuth } = require('firebase-admin/auth');
+const { FieldValue, getFirestore } = require('firebase-admin/firestore');
 const fs = require('fs');
-const { v4: uuidv4 } = require('uuid');
-
-// ----------------------------------------------------------------------
-// 1. CONFIGURATION & CONSTANTS
-// ----------------------------------------------------------------------
-const PORT = process.env.PORT || 5000;
-const ZULORA_HELPLINE = "+91 6395211325";
-const ZULORA_EMAIL = "shivenpanwar412@gmail.com";
-const FREE_STORAGE_LIMIT_BYTES = 5 * 1024 * 1024 * 1024; // 5 GB default
-const PRO_STORAGE_LIMIT_BYTES = 100 * 1024 * 1024 * 1024; // 100 GB Pro
+const fsp = require('fs/promises');
+const path = require('path');
 
 const app = express();
+const PORT = Number(process.env.PORT || 5000);
+const ADMIN_EMAIL = 'zulora.help@gmail.com';
+const PAYMENT_UPI_ID = 'shivenpanwar@fam';
+const GIB = 1024 ** 3;
+const MAX_FILE_SIZE = Number(process.env.MAX_FILE_SIZE_BYTES || 500 * 1024 * 1024);
+const UPLOAD_ROOT = path.resolve(process.env.UPLOAD_DIR || path.join(__dirname, 'uploads'));
+const FRONTEND_ROOT = path.resolve(__dirname, '..', 'frontend');
 
-// Security and Logging Middleware
-app.use(helmet());
-app.use(cors({ origin: '*' }));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(morgan('dev'));
-
-// ----------------------------------------------------------------------
-// 2. FIREBASE ADMIN SDK SETUP
-// ----------------------------------------------------------------------
-// Bhai, production ke liye 'firebase-adminsdk.json' download karke rakhna
-// Firebase Console -> Project Settings -> Service Accounts -> Generate New Private Key
-let db = null;
-
-try {
-    const serviceAccount = require('./firebase-adminsdk.json'); // Path to your key
-    admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
-        storageBucket: "zulora-drive.firebasestorage.app"
-    });
-    db = admin.firestore();
-    console.log("🔥 Firebase Admin SDK Initialized Successfully!");
-} catch (error) {
-    console.warn("⚠️ Warning: Firebase Admin key missing! Running in local mock mode for UI testing.");
-    db = null;
-}
-
-// ----------------------------------------------------------------------
-// 3. FILE UPLOAD CONFIGURATION (MULTER)
-// ----------------------------------------------------------------------
-// Vercel serverless environment check for /tmp directory
-const uploadDir = process.env.VERCEL ? '/tmp' : path.join(__dirname, 'uploads');
-if (!fs.existsSync(uploadDir)) {
-    fs.mkdirSync(uploadDir, { recursive: true });
-}
-
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, uploadDir);
-    },
-    filename: (req, file, cb) => {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        const safeName = file.originalname.replace(/[^a-zA-Z0-9.]/g, '_');
-        cb(null, `${uniqueSuffix}-${safeName}`);
-    }
+const PLANS = Object.freeze({
+  starter: { key: 'starter', label: 'Starter', price: 0, storageLimit: 10 * GIB },
+  storage_lite: { key: 'storage_lite', label: 'Storage Lite', price: 70, storageLimit: 50 * GIB },
+  business_pro: { key: 'business_pro', label: 'Business Pro', price: 140, storageLimit: 100 * GIB },
+  ultra_max: { key: 'ultra_max', label: 'Ultra Max', price: 240, storageLimit: 200 * GIB }
 });
+
+class ApiError extends Error {
+  constructor(status, message, code = 'REQUEST_FAILED') {
+    super(message);
+    this.status = status;
+    this.code = code;
+  }
+}
+
+function normalizeEmail(email) {
+  return String(email || '').trim().toLowerCase();
+}
+
+function asSafeSegment(value) {
+  const safe = String(value || '').replace(/[^a-zA-Z0-9_-]/g, '_');
+  return safe || crypto.createHash('sha256').update(String(value || '')).digest('hex');
+}
+
+function userDirectory(uid) {
+  const directory = path.resolve(UPLOAD_ROOT, asSafeSegment(uid));
+  if (!directory.startsWith(`${UPLOAD_ROOT}${path.sep}`)) {
+    throw new ApiError(400, 'Invalid user storage path.', 'INVALID_STORAGE_PATH');
+  }
+  return directory;
+}
+
+function safeOriginalName(name) {
+  const baseName = path.basename(String(name || 'file'));
+  const cleaned = baseName
+    .replace(/[\u0000-\u001f<>:"/\\|?*]/g, '_')
+    .replace(/^\.+$/, 'file')
+    .trim();
+  return (cleaned || 'file').slice(0, 180);
+}
+
+function contentDispositionName(name) {
+  return safeOriginalName(name).replace(/["\\]/g, '_');
+}
+
+function timestampToIso(value) {
+  if (!value) return null;
+  if (typeof value.toDate === 'function') return value.toDate().toISOString();
+  if (value instanceof Date) return value.toISOString();
+  return typeof value === 'string' ? value : null;
+}
+
+function profileForClient(profile) {
+  return {
+    uid: profile.uid,
+    accountId: profile.accountId,
+    email: profile.email,
+    displayName: profile.displayName || '',
+    photoURL: profile.photoURL || '',
+    tier: profile.tier || PLANS.starter.key,
+    storageUsed: Number(profile.storageUsed || 0),
+    storageLimit: Number(profile.storageLimit || PLANS.starter.storageLimit),
+    isAdmin: normalizeEmail(profile.email) === ADMIN_EMAIL,
+    createdAt: timestampToIso(profile.createdAt),
+    updatedAt: timestampToIso(profile.updatedAt)
+  };
+}
+
+function fileForClient(id, file) {
+  return {
+    id,
+    originalName: file.originalName,
+    size: Number(file.size || 0),
+    mimetype: file.mimetype || 'application/octet-stream',
+    isStarred: Boolean(file.isStarred),
+    uploadedAt: timestampToIso(file.uploadedAt),
+    updatedAt: timestampToIso(file.updatedAt)
+  };
+}
+
+function planFromKey(key) {
+  const plan = PLANS[String(key || '').toLowerCase()];
+  if (!plan) throw new ApiError(400, 'Select a valid storage plan.', 'INVALID_PLAN');
+  return plan;
+}
+
+// Firebase Admin is deliberately required for authenticated API endpoints.
+// Set FIREBASE_SERVICE_ACCOUNT_JSON or place firebase-adminsdk.json beside this file.
+let db;
+let firebaseReady = false;
+try {
+  let credential;
+  if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
+    credential = cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON));
+  } else {
+    const keyFile = path.join(__dirname, 'firebase-adminsdk.json');
+    if (fs.existsSync(keyFile)) credential = cert(require(keyFile));
+    else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) credential = applicationDefault();
+  }
+  if (!credential) throw new Error('No Firebase Admin credential was configured.');
+  if (!getApps().length) initializeApp({ credential, storageBucket: 'zulora-drive.firebasestorage.app' });
+  db = getFirestore();
+  firebaseReady = true;
+  console.info('Firebase Admin initialized.');
+} catch (error) {
+  console.warn(`Firebase Admin unavailable: ${error.message}`);
+}
+
+fs.mkdirSync(UPLOAD_ROOT, { recursive: true });
+
+const configuredOrigins = (process.env.CORS_ORIGINS || '')
+  .split(',').map((origin) => origin.trim()).filter(Boolean);
+const developmentOrigins = new Set([
+  'http://localhost:5000', 'http://localhost:5500',
+  'http://127.0.0.1:5000', 'http://127.0.0.1:5500'
+]);
+
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"], baseUri: ["'self'"], objectSrc: ["'none'"],
+      scriptSrc: ["'self'", 'https://www.gstatic.com', 'https://cdnjs.cloudflare.com'],
+      styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com', 'https://cdnjs.cloudflare.com'],
+      fontSrc: ["'self'", 'https://fonts.gstatic.com', 'https://cdnjs.cloudflare.com', 'data:'],
+      imgSrc: ["'self'", 'data:', 'blob:', 'https:'],
+      connectSrc: ["'self'", 'https://identitytoolkit.googleapis.com', 'https://securetoken.googleapis.com', 'https://www.googleapis.com', 'https://firestore.googleapis.com'],
+      frameSrc: ["'self'", 'https://accounts.google.com']
+    }
+  }
+}));
+app.use(cors({
+  origin(origin, callback) {
+    if (!origin || configuredOrigins.includes('*') || configuredOrigins.includes(origin) ||
+      (process.env.NODE_ENV !== 'production' && developmentOrigins.has(origin))) return callback(null, true);
+    return callback(new ApiError(403, 'This origin is not allowed to use the API.', 'ORIGIN_FORBIDDEN'));
+  },
+  methods: ['GET', 'POST', 'PATCH', 'DELETE'],
+  allowedHeaders: ['Authorization', 'Content-Type'],
+  maxAge: 86400
+}));
+app.use(express.json({ limit: '100kb' }));
+app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
+
+function requireFirebase(req, res, next) {
+  if (!firebaseReady) return next(new ApiError(503, 'Server authentication is not configured. Add Firebase Admin credentials before using the API.', 'FIREBASE_NOT_CONFIGURED'));
+  return next();
+}
+
+async function authenticate(req, res, next) {
+  try {
+    const match = (req.get('authorization') || '').match(/^Bearer\s+(.+)$/i);
+    if (!match) throw new ApiError(401, 'A Firebase ID token is required.', 'AUTH_REQUIRED');
+    const token = await getAuth().verifyIdToken(match[1], true);
+    if (!token.uid || !token.email) throw new ApiError(401, 'A verified email address is required.', 'EMAIL_REQUIRED');
+    req.user = { uid: token.uid, email: normalizeEmail(token.email), name: token.name || '', picture: token.picture || '' };
+    return next();
+  } catch (error) {
+    return next(error instanceof ApiError ? error : new ApiError(401, 'Your session has expired. Please sign in again.', 'INVALID_TOKEN'));
+  }
+}
+
+function requireAdmin(req, res, next) {
+  return normalizeEmail(req.user?.email) === ADMIN_EMAIL
+    ? next()
+    : next(new ApiError(403, 'Administrator access is required.', 'ADMIN_REQUIRED'));
+}
+
+async function bootstrapProfile(user, input = {}) {
+  const userRef = db.collection('users').doc(user.uid);
+  const requestedName = String(input.displayName || user.name || user.email.split('@')[0]).trim().slice(0, 80);
+  const requestedPhoto = String(input.photoURL || user.picture || '').trim().slice(0, 1000);
+
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    const accountId = `ZUL-${crypto.randomInt(100000, 1000000)}`;
+    const accountRef = db.collection('accountIds').doc(accountId);
+    const now = new Date();
+    const profile = await db.runTransaction(async (transaction) => {
+      const existing = await transaction.get(userRef);
+      if (existing.exists) {
+        const current = existing.data();
+        const updates = { updatedAt: FieldValue.serverTimestamp() };
+        if (input.displayName && requestedName) updates.displayName = requestedName;
+        if (input.photoURL && requestedPhoto) updates.photoURL = requestedPhoto;
+        if (Object.keys(updates).length > 1) transaction.update(userRef, updates);
+        return { ...current, ...updates, uid: user.uid, email: user.email };
+      }
+      const accountTaken = await transaction.get(accountRef);
+      if (accountTaken.exists) return null;
+      const newProfile = {
+        uid: user.uid, accountId, email: user.email, displayName: requestedName, photoURL: requestedPhoto,
+        tier: PLANS.starter.key, storageUsed: 0, storageLimit: PLANS.starter.storageLimit,
+        createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp()
+      };
+      transaction.create(accountRef, { uid: user.uid, createdAt: FieldValue.serverTimestamp() });
+      transaction.create(userRef, newProfile);
+      return { ...newProfile, createdAt: now, updatedAt: now };
+    });
+    if (profile) return profileForClient(profile);
+  }
+  throw new ApiError(503, 'Could not allocate an account ID. Please retry.', 'ACCOUNT_ID_ALLOCATION_FAILED');
+}
+
+async function getProfile(user) {
+  const snapshot = await db.collection('users').doc(user.uid).get();
+  return snapshot.exists ? profileForClient(snapshot.data()) : bootstrapProfile(user);
+}
+
+async function ownedFile(fileId, uid) {
+  const id = String(fileId || '').trim();
+  if (!id || id.length > 128) throw new ApiError(400, 'Invalid file id.', 'INVALID_FILE_ID');
+  const ref = db.collection('files').doc(id);
+  const snapshot = await ref.get();
+  if (!snapshot.exists || snapshot.data().ownerUid !== uid) throw new ApiError(404, 'File not found.', 'FILE_NOT_FOUND');
+  return { ref, data: snapshot.data() };
+}
 
 const upload = multer({
-    storage: storage,
-    limits: { fileSize: 500 * 1024 * 1024 } // 500MB max per file limit
+  storage: multer.diskStorage({
+    destination(req, file, callback) {
+      try {
+        const directory = userDirectory(req.user.uid);
+        fs.mkdirSync(directory, { recursive: true });
+        callback(null, directory);
+      } catch (error) { callback(error); }
+    },
+    filename(req, file, callback) {
+      const extension = path.extname(safeOriginalName(file.originalname)).slice(0, 20);
+      callback(null, `${Date.now()}-${crypto.randomUUID()}${extension}`);
+    }
+  }),
+  limits: { fileSize: MAX_FILE_SIZE, files: 1, fields: 10 },
+  fileFilter(req, file, callback) {
+    return !file.originalname || file.originalname.length > 500
+      ? callback(new ApiError(400, 'Choose a valid file name.', 'INVALID_FILE_NAME'))
+      : callback(null, true);
+  }
 });
 
-// ----------------------------------------------------------------------
-// 4. AUTHENTICATION MIDDLEWARE
-// ----------------------------------------------------------------------
-// Yeh middleware ensure karega ki sirf verified users API access karein
-const verifyToken = async (req, res, next) => {
-    const bearerHeader = req.headers['authorization'];
-    if (!bearerHeader) {
-        return res.status(403).json({ error: "Access Denied: No Token Provided. 🛑" });
-    }
-    const token = bearerHeader.split(' ')[1];
-    try {
-        if (db && admin.apps.length > 0) {
-            const decodedToken = await admin.auth().verifyIdToken(token);
-            req.user = decodedToken;
-        } else {
-            // Fallback for dev mode
-            req.user = { uid: "test-user-id", email: "test@zulora.com" };
-        }
-        next();
-    } catch (error) {
-        return res.status(401).json({ error: "Invalid or Expired Token! 🔒" });
-    }
-};
+app.get('/api/health', (req, res) => res.json({ status: 'ok', firebaseConfigured: firebaseReady, timestamp: new Date().toISOString() }));
+app.get('/api/plans', (req, res) => res.json({
+  plans: Object.values(PLANS).map((plan) => ({ ...plan, storageLimitGb: plan.storageLimit / GIB })), paymentUpiId: PAYMENT_UPI_ID
+}));
 
-// ----------------------------------------------------------------------
-// 5. CORE API ROUTES
-// ----------------------------------------------------------------------
+app.post('/api/users/me/bootstrap', requireFirebase, authenticate, async (req, res, next) => {
+  try { res.json({ profile: await bootstrapProfile(req.user, req.body || {}) }); } catch (error) { next(error); }
+});
+app.get('/api/users/me', requireFirebase, authenticate, async (req, res, next) => {
+  try { res.json({ profile: await getProfile(req.user) }); } catch (error) { next(error); }
+});
+app.patch('/api/users/me', requireFirebase, authenticate, async (req, res, next) => {
+  try {
+    const displayName = String(req.body?.displayName || '').trim();
+    if (displayName.length < 2 || displayName.length > 80) throw new ApiError(400, 'Display name must be 2–80 characters.', 'INVALID_DISPLAY_NAME');
+    await db.collection('users').doc(req.user.uid).set({ displayName, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+    res.json({ profile: await getProfile(req.user) });
+  } catch (error) { next(error); }
+});
 
-// @route   GET /api/system/info
-// @desc    Get system contact info
-app.get('/api/system/info', (req, res) => {
-    res.json({
-        app: "Zulora Drive Enterprise",
-        founder: "Shiven Panwar",
-        helpline: ZULORA_HELPLINE,
-        email: ZULORA_EMAIL,
-        status: "Online 🟢"
+app.get('/api/files', requireFirebase, authenticate, async (req, res, next) => {
+  try {
+    await getProfile(req.user);
+    const snapshot = await db.collection('files').where('ownerUid', '==', req.user.uid).get();
+    const files = snapshot.docs.map((doc) => fileForClient(doc.id, doc.data()))
+      .sort((a, b) => new Date(b.uploadedAt || 0) - new Date(a.uploadedAt || 0));
+    res.json({ files });
+  } catch (error) { next(error); }
+});
+
+app.post('/api/files', requireFirebase, authenticate, upload.single('file'), async (req, res, next) => {
+  if (!req.file) return next(new ApiError(400, 'Attach one file to upload.', 'FILE_REQUIRED'));
+  const removeUploadedFile = async () => fsp.unlink(req.file.path).catch(() => undefined);
+  try {
+    const fileRef = db.collection('files').doc();
+    const originalName = safeOriginalName(req.file.originalname);
+    const uploadedAt = new Date();
+    await db.runTransaction(async (transaction) => {
+      const profileRef = db.collection('users').doc(req.user.uid);
+      const profileSnap = await transaction.get(profileRef);
+      if (!profileSnap.exists) throw new ApiError(409, 'Your account is still being set up. Retry the upload.', 'PROFILE_NOT_READY');
+      const profile = profileSnap.data();
+      const used = Number(profile.storageUsed || 0);
+      const limit = Number(profile.storageLimit || PLANS.starter.storageLimit);
+      if (used + req.file.size > limit) throw new ApiError(413, 'This upload would exceed your storage quota. Upgrade your plan to continue.', 'QUOTA_EXCEEDED');
+      transaction.set(fileRef, {
+        ownerUid: req.user.uid, originalName, storedName: req.file.filename, size: req.file.size,
+        mimetype: req.file.mimetype || 'application/octet-stream', isStarred: false,
+        uploadedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp()
+      });
+      transaction.update(profileRef, { storageUsed: used + req.file.size, updatedAt: FieldValue.serverTimestamp() });
     });
+    return res.status(201).json({ file: fileForClient(fileRef.id, {
+      originalName, size: req.file.size, mimetype: req.file.mimetype, isStarred: false, uploadedAt, updatedAt: uploadedAt
+    }) });
+  } catch (error) {
+    await removeUploadedFile();
+    return next(error);
+  }
 });
 
-// @route   POST /api/user/profile
-// @desc    Create or Update User Profile in Firestore
-app.post('/api/user/profile', verifyToken, async (req, res) => {
-    const { displayName, photoURL } = req.body;
-    try {
-        if (!db) return res.json({ success: true, message: "Profile updated (Mock Mode)" });
+app.patch('/api/files/:fileId', requireFirebase, authenticate, async (req, res, next) => {
+  try {
+    const { ref, data } = await ownedFile(req.params.fileId, req.user.uid);
+    const updates = { updatedAt: FieldValue.serverTimestamp() };
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, 'isStarred')) updates.isStarred = Boolean(req.body.isStarred);
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, 'originalName')) updates.originalName = safeOriginalName(req.body.originalName);
+    if (Object.keys(updates).length === 1) throw new ApiError(400, 'No supported file changes were provided.', 'EMPTY_UPDATE');
+    await ref.update(updates);
+    res.json({ file: fileForClient(ref.id, { ...data, ...updates, updatedAt: new Date() }) });
+  } catch (error) { next(error); }
+});
 
-        const userRef = db.collection('users').doc(req.user.uid);
-        const doc = await userRef.get();
-        
-        if (!doc.exists) {
-            // New User Setup
-            await userRef.set({
-                uid: req.user.uid,
-                email: req.user.email,
-                displayName: displayName || req.user.email.split('@')[0],
-                photoURL: photoURL || "",
-                storageUsed: 0,
-                storageLimit: FREE_STORAGE_LIMIT_BYTES,
-                tier: "free",
-                createdAt: admin.firestore.FieldValue.serverTimestamp()
-            });
-        } else {
-            // Update Profile Name
-            await userRef.update({
-                displayName: displayName,
-                photoURL: photoURL
-            });
-        }
-        res.json({ success: true, message: "Profile Synchronized Successfully! ✨" });
-    } catch (error) {
-        console.error("Profile Error:", error);
-        res.status(500).json({ error: "Failed to update profile." });
+app.get('/api/files/:fileId/content', requireFirebase, authenticate, async (req, res, next) => {
+  try {
+    const { data } = await ownedFile(req.params.fileId, req.user.uid);
+    const directory = userDirectory(req.user.uid);
+    const filePath = path.resolve(directory, path.basename(String(data.storedName || '')));
+    if (!filePath.startsWith(`${directory}${path.sep}`) || !fs.existsSync(filePath)) throw new ApiError(404, 'The stored file is unavailable.', 'STORAGE_FILE_NOT_FOUND');
+    const download = String(req.query.download || '') === '1';
+    res.setHeader('Content-Type', data.mimetype || 'application/octet-stream');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Content-Disposition', `${download ? 'attachment' : 'inline'}; filename="${contentDispositionName(data.originalName)}"`);
+    res.sendFile(filePath, { acceptRanges: true }, (error) => { if (error && !res.headersSent) next(error); });
+  } catch (error) { next(error); }
+});
+
+app.delete('/api/files/:fileId', requireFirebase, authenticate, async (req, res, next) => {
+  try {
+    const fileRef = db.collection('files').doc(String(req.params.fileId || ''));
+    let deletedFile;
+    await db.runTransaction(async (transaction) => {
+      const profileRef = db.collection('users').doc(req.user.uid);
+      const [fileSnap, profileSnap] = await Promise.all([transaction.get(fileRef), transaction.get(profileRef)]);
+      if (!fileSnap.exists || fileSnap.data().ownerUid !== req.user.uid) throw new ApiError(404, 'File not found.', 'FILE_NOT_FOUND');
+      if (!profileSnap.exists) throw new ApiError(409, 'User profile not found.', 'PROFILE_NOT_READY');
+      deletedFile = fileSnap.data();
+      transaction.delete(fileRef);
+      transaction.update(profileRef, {
+        storageUsed: Math.max(0, Number(profileSnap.data().storageUsed || 0) - Number(deletedFile.size || 0)),
+        updatedAt: FieldValue.serverTimestamp()
+      });
+    });
+    const directory = userDirectory(req.user.uid);
+    const diskPath = path.resolve(directory, path.basename(String(deletedFile.storedName || '')));
+    if (diskPath.startsWith(`${directory}${path.sep}`)) await fsp.unlink(diskPath).catch(() => undefined);
+    res.status(204).end();
+  } catch (error) { next(error); }
+});
+
+app.post('/api/upgrade-requests', requireFirebase, authenticate, async (req, res, next) => {
+  try {
+    const plan = planFromKey(req.body?.plan);
+    if (plan.key === PLANS.starter.key) throw new ApiError(400, 'The Starter plan does not require a payment request.', 'FREE_PLAN');
+    const profile = await getProfile(req.user);
+    const requestRef = db.collection('upgradeRequests').doc();
+    await requestRef.set({
+      userUid: req.user.uid, accountId: profile.accountId, email: req.user.email, plan: plan.key, amount: plan.price,
+      paymentReference: String(req.body?.paymentReference || '').trim().slice(0, 80), status: 'pending',
+      createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp()
+    });
+    res.status(201).json({ requestId: requestRef.id, status: 'pending' });
+  } catch (error) { next(error); }
+});
+
+app.get('/api/admin/overview', requireFirebase, authenticate, requireAdmin, async (req, res, next) => {
+  try {
+    const [users, files, requests] = await Promise.all([
+      db.collection('users').get(), db.collection('files').get(), db.collection('upgradeRequests').where('status', '==', 'pending').get()
+    ]);
+    let storageUsed = 0;
+    users.forEach((doc) => { storageUsed += Number(doc.data().storageUsed || 0); });
+    res.json({ users: users.size, files: files.size, storageUsed, pendingUpgradeRequests: requests.size });
+  } catch (error) { next(error); }
+});
+
+app.get('/api/admin/users', requireFirebase, authenticate, requireAdmin, async (req, res, next) => {
+  try {
+    const snapshot = await db.collection('users').get();
+    const users = snapshot.docs.map((doc) => profileForClient(doc.data())).sort((a, b) => (a.email || '').localeCompare(b.email || ''));
+    res.json({ users });
+  } catch (error) { next(error); }
+});
+
+// This is an authenticated, logical view of the local storage tree. Raw files
+// are still only streamed through the owner-authorized content endpoint.
+app.get('/api/admin/files', requireFirebase, authenticate, requireAdmin, async (req, res, next) => {
+  try {
+    const snapshot = await db.collection('files').get();
+    const files = snapshot.docs.map((doc) => {
+      const data = fileForClient(doc.id, doc.data());
+      return { ...data, ownerUid: doc.data().ownerUid, storageFolder: `uploads/${asSafeSegment(doc.data().ownerUid)}` };
+    }).sort((a, b) => new Date(b.uploadedAt || 0) - new Date(a.uploadedAt || 0));
+    res.json({ files });
+  } catch (error) { next(error); }
+});
+
+app.patch('/api/admin/users/:uid', requireFirebase, authenticate, requireAdmin, async (req, res, next) => {
+  try {
+    const targetUid = String(req.params.uid || '').trim();
+    if (!targetUid || targetUid.length > 256) throw new ApiError(400, 'Invalid target user.', 'INVALID_USER');
+    const targetRef = db.collection('users').doc(targetUid);
+    if (!(await targetRef.get()).exists) throw new ApiError(404, 'User not found.', 'USER_NOT_FOUND');
+    const updates = { updatedAt: FieldValue.serverTimestamp() };
+    if (req.body?.plan) {
+      const plan = planFromKey(req.body.plan);
+      updates.tier = plan.key;
+      updates.storageLimit = plan.storageLimit;
     }
-});
-
-// @route   GET /api/user/storage
-// @desc    Get user's storage limits and usage
-app.get('/api/user/storage', verifyToken, async (req, res) => {
-    try {
-        if (!db) {
-            return res.json({
-                storageUsed: 1024 * 1024 * 500, // 500MB mock
-                storageLimit: FREE_STORAGE_LIMIT_BYTES,
-                tier: "free"
-            });
-        }
-        
-        const userRef = db.collection('users').doc(req.user.uid);
-        const doc = await userRef.get();
-        
-        if (doc.exists) {
-            res.json(doc.data());
-        } else {
-            res.status(404).json({ error: "User record not found." });
-        }
-    } catch (error) {
-        res.status(500).json({ error: "Error fetching storage data." });
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, 'storageLimitGb')) {
+      const gigabytes = Number(req.body.storageLimitGb);
+      if (!Number.isFinite(gigabytes) || gigabytes < 10 || gigabytes > 5000) throw new ApiError(400, 'Storage quota must be between 10 and 5,000 GB.', 'INVALID_QUOTA');
+      updates.storageLimit = Math.floor(gigabytes * GIB);
+      if (!req.body?.plan) updates.tier = 'custom';
     }
+    if (Object.keys(updates).length === 1) throw new ApiError(400, 'Provide a plan or storage quota.', 'EMPTY_UPDATE');
+    await targetRef.update(updates);
+    res.json({ profile: profileForClient((await targetRef.get()).data()) });
+  } catch (error) { next(error); }
 });
 
-// @route   POST /api/files/upload
-// @desc    Upload file & track storage
-app.post('/api/files/upload', verifyToken, upload.single('file'), async (req, res) => {
-    if (!req.file) return res.status(400).json({ error: "No file detected! 📂" });
+app.get('/api/admin/upgrade-requests', requireFirebase, authenticate, requireAdmin, async (req, res, next) => {
+  try {
+    const snapshot = await db.collection('upgradeRequests').get();
+    const requests = snapshot.docs.map((doc) => {
+      const data = doc.data();
+      return { id: doc.id, ...data, createdAt: timestampToIso(data.createdAt), updatedAt: timestampToIso(data.updatedAt) };
+    }).sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+    res.json({ requests });
+  } catch (error) { next(error); }
+});
 
-    try {
-        const fileSize = req.file.size;
-        
-        if (db) {
-            const userRef = db.collection('users').doc(req.user.uid);
-            const doc = await userRef.get();
-            const userData = doc.data();
-            
-            // Check limit before saving metadata
-            if (userData.storageUsed + fileSize > userData.storageLimit) {
-                // Delete the temporarily uploaded file
-                fs.unlinkSync(req.file.path);
-                return res.status(403).json({ 
-                    error: "Storage limit exceeded! Please upgrade your plan. ⚠️" 
-                });
-            }
-
-            // Save file metadata to Firestore
-            const fileData = {
-                fileId: uuidv4(),
-                uid: req.user.uid,
-                originalName: req.file.originalname,
-                fileName: req.file.filename,
-                size: fileSize,
-                mimetype: req.file.mimetype,
-                uploadDate: admin.firestore.FieldValue.serverTimestamp(),
-                isStarred: false
-            };
-
-            await db.collection('files').add(fileData);
-            
-            // Update user's total storage used
-            await userRef.update({
-                storageUsed: admin.firestore.FieldValue.increment(fileSize)
-            });
-        }
-
-        res.json({
-            success: true,
-            message: "File successfully secured in Zulora Drive! 🚀",
-            file: req.file.filename
+app.patch('/api/admin/upgrade-requests/:requestId', requireFirebase, authenticate, requireAdmin, async (req, res, next) => {
+  try {
+    const status = String(req.body?.status || '').toLowerCase();
+    if (!['approved', 'rejected'].includes(status)) throw new ApiError(400, 'Status must be approved or rejected.', 'INVALID_STATUS');
+    const requestRef = db.collection('upgradeRequests').doc(String(req.params.requestId || ''));
+    await db.runTransaction(async (transaction) => {
+      const requestSnap = await transaction.get(requestRef);
+      if (!requestSnap.exists) throw new ApiError(404, 'Upgrade request not found.', 'REQUEST_NOT_FOUND');
+      const request = requestSnap.data();
+      transaction.update(requestRef, {
+        status, reviewedBy: req.user.email, reviewedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp()
+      });
+      if (status === 'approved') {
+        const plan = planFromKey(request.plan);
+        transaction.update(db.collection('users').doc(request.userUid), {
+          tier: plan.key, storageLimit: plan.storageLimit, updatedAt: FieldValue.serverTimestamp()
         });
-
-    } catch (error) {
-        console.error("Upload Error:", error);
-        res.status(500).json({ error: "Server encountered an issue during upload." });
-    }
+      }
+    });
+    res.json({ success: true, status });
+  } catch (error) { next(error); }
 });
 
-// @route   GET /api/files/list
-// @desc    Get all files for user
-app.get('/api/files/list', verifyToken, async (req, res) => {
-    try {
-        if (!db) {
-            return res.json({ files: [] });
-        }
-        
-        const filesRef = db.collection('files').where('uid', '==', req.user.uid);
-        const snapshot = await filesRef.get();
-        
-        const filesList = [];
-        snapshot.forEach(doc => {
-            filesList.push({ id: doc.id, ...doc.data() });
-        });
-        
-        res.json({ files: filesList });
-    } catch (error) {
-        res.status(500).json({ error: "Failed to retrieve files." });
-    }
+// Serve the client application, but never the uploads tree.
+app.use(express.static(FRONTEND_ROOT, {
+  extensions: ['html'], index: 'index.html', maxAge: process.env.NODE_ENV === 'production' ? '1h' : 0
+}));
+app.use('/api', (req, res, next) => next(new ApiError(404, 'API route not found.', 'ROUTE_NOT_FOUND')));
+
+app.use((error, req, res, next) => {
+  if (error instanceof multer.MulterError) {
+    const message = error.code === 'LIMIT_FILE_SIZE' ? `Each file must be ${Math.floor(MAX_FILE_SIZE / 1024 / 1024)} MB or smaller.` : 'Upload request is invalid.';
+    return res.status(400).json({ error: message, code: error.code });
+  }
+  const status = Number(error.status) || 500;
+  if (status >= 500) console.error(error);
+  return res.status(status).json({ error: status >= 500 ? 'An unexpected server error occurred.' : error.message, code: error.code || 'INTERNAL_ERROR' });
 });
 
-// @route   GET /api/files/search
-// @desc    Search files by name
-app.get('/api/files/search', verifyToken, async (req, res) => {
-    const query = req.query.q ? req.query.q.toLowerCase() : '';
-    try {
-        if (!db) return res.json({ files: [] });
-        
-        // Fetch all user files and filter (Firestore doesn't support native partial text search easily)
-        const snapshot = await db.collection('files').where('uid', '==', req.user.uid).get();
-        const results = [];
-        
-        snapshot.forEach(doc => {
-            const data = doc.data();
-            if (data.originalName.toLowerCase().includes(query)) {
-                results.push({ id: doc.id, ...data });
-            }
-        });
-        
-        res.json({ files: results });
-    } catch (error) {
-        res.status(500).json({ error: "Search execution failed." });
-    }
-});
-
-// ----------------------------------------------------------------------
-// 6. ADMIN UTILITIES (For Shiven only)
-// ----------------------------------------------------------------------
-
-// @route   POST /api/admin/upgrade
-// @desc    Manual trigger to upgrade user storage after UPI Payment verification
-app.post('/api/admin/upgrade', async (req, res) => {
-    const { adminSecret, targetUid, tier } = req.body;
-    
-    // Simple admin secret check
-    if (adminSecret !== process.env.ADMIN_SECRET) {
-        return res.status(403).json({ error: "Unauthorized Admin Attempt! 🚨" });
-    }
-
-    try {
-        let newLimit = FREE_STORAGE_LIMIT_BYTES;
-        if (tier === 'pro') newLimit = PRO_STORAGE_LIMIT_BYTES;
-        
-        if (db) {
-            await db.collection('users').doc(targetUid).update({
-                tier: tier,
-                storageLimit: newLimit
-            });
-        }
-        
-        res.json({ success: true, message: `User upgraded to ${tier.toUpperCase()} successfully!` });
-    } catch (error) {
-        res.status(500).json({ error: "Database update failed." });
-    }
-});
-
-// 404 Handler
-app.use((req, res) => {
-    res.status(404).json({ error: "API Endpoint not found in Zulora Drive 🌌" });
-});
-
-// ----------------------------------------------------------------------
-// 7. SERVER INITIALIZATION
-// ----------------------------------------------------------------------
-app.listen(PORT, () => {
-    console.log(`\n======================================================`);
-    console.log(`🚀 ZULORA DRIVE BACKEND IS LIVE!`);
-    console.log(`👨‍💻 Founder: Shiven Panwar`);
-    console.log(`📞 Support: ${ZULORA_HELPLINE}`);
-    console.log(`📧 Email: ${ZULORA_EMAIL}`);
-    console.log(`🌍 Server running on Port: ${PORT}`);
-    console.log(`======================================================\n`);
-});
-
+if (require.main === module) app.listen(PORT, () => console.info(`Zulora Drive API listening on http://localhost:${PORT}`));
 module.exports = app;

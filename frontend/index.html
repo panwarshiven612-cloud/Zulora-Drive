@@ -1,365 +1,114 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Zulora Drive - Enterprise Multimodal Cloud Storage Platform built by Zulora AI">
-    <meta name="author" content="Shiven Panwar">
-    <title>My Drive - Zulora Enterprise Cloud Storage</title>
-    
-    <!-- Design & Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    
-    <!-- Primary StyleSheet -->
-    <link rel="stylesheet" href="style.css">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Zulora Drive — secure private cloud storage.">
+  <title>My Drive · Zulora Drive</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
+  <link rel="stylesheet" href="style.css">
 </head>
-<body class="dashboard-body">
+<body data-page="drive">
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="Drive navigation">
+      <a class="brand" href="index.html">
+        <img src="https://i.postimg.cc/VL9RBtWh/Elegant-AI-Agency-Logo-for-Zulora-20260208-153446-0000.png" alt="Zulora logo">
+        <span>Zulora Drive<small>PRIVATE CLOUD STORAGE</small></span>
+      </a>
+      <input id="fileInput" type="file" hidden multiple>
+      <button id="newUploadButton" class="button new-upload" type="button"><i class="fa-solid fa-plus"></i> New upload</button>
+      <nav>
+        <p class="nav-label">MY DRIVE</p>
+        <button class="nav-button active" data-filter="all" type="button"><i class="fa-solid fa-hard-drive"></i> All files</button>
+        <button class="nav-button" data-filter="recent" type="button"><i class="fa-regular fa-clock"></i> Recent</button>
+        <button class="nav-button" data-filter="starred" type="button"><i class="fa-regular fa-star"></i> Starred</button>
+        <p class="nav-label">FILE TYPES</p>
+        <button class="nav-button" data-filter="image" type="button"><i class="fa-regular fa-image"></i> Images</button>
+        <button class="nav-button" data-filter="video" type="button"><i class="fa-solid fa-film"></i> Video & audio</button>
+        <button class="nav-button" data-filter="document" type="button"><i class="fa-regular fa-file-lines"></i> Documents</button>
+      </nav>
+      <section class="storage-card glass" aria-label="Storage usage">
+        <strong id="tierLabel">Starter</strong>
+        <div class="meter"><span id="storageMeter"></span></div>
+        <span id="storageText" class="muted">Loading storage…</span>
+        <a class="button ghost small wide" href="pricing.html">Upgrade storage</a>
+      </section>
+    </aside>
 
-    <!-- APP WRAPPER -->
-    <div class="app-container">
-        
-        <!-- SIDEBAR NAVIGATION -->
-        <aside class="sidebar glass-card" id="mainSidebar">
-            <!-- Brand Logo Header -->
-            <div class="brand-header">
-                <div class="brand-logo-wrapper">
-                    <i class="fas fa-cloud-meatball brand-icon"></i>
-                    <div class="brand-text">
-                        <h2>Zulora <span>Drive</span></h2>
-                        <span class="badge-tag">ENTERPRISE</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Primary Action Button -->
-            <div class="sidebar-action-wrapper">
-                <button class="btn btn-primary btn-upload-main" id="sidebarUploadBtn">
-                    <i class="fas fa-plus icon-left"></i>
-                    <span>New Upload</span>
-                </button>
-            </div>
-
-            <!-- Main Navigation Links -->
-            <nav class="sidebar-nav">
-                <div class="nav-section">
-                    <span class="nav-section-title">CORE STORAGE</span>
-                    <ul class="nav-list">
-                        <li class="nav-item active" data-view="mydrive">
-                            <a href="#" class="nav-link">
-                                <i class="fas fa-hard-drive nav-icon"></i>
-                                <span>My Drive</span>
-                                <span class="badge-count" id="countMyDrive">0</span>
-                            </a>
-                        </li>
-                        <li class="nav-item" data-view="recent">
-                            <a href="#" class="nav-link">
-                                <i class="fas fa-clock nav-icon"></i>
-                                <span>Recent Files</span>
-                            </a>
-                        </li>
-                        <li class="nav-item" data-view="starred">
-                            <a href="#" class="nav-link">
-                                <i class="fas fa-star nav-icon"></i>
-                                <span>Starred Files</span>
-                                <span class="badge-count" id="countStarred">0</span>
-                            </a>
-                        </li>
-                        <li class="nav-item" data-view="shared">
-                            <a href="#" class="nav-link">
-                                <i class="fas fa-users nav-icon"></i>
-                                <span>Shared with Me</span>
-                            </a>
-                        </li>
-                    </ul>
-                </div>
-
-                <div class="nav-section">
-                    <span class="nav-section-title">CATEGORIES</span>
-                    <ul class="nav-list">
-                        <li class="nav-item" data-filter="document">
-                            <a href="#" class="nav-link">
-                                <i class="fas fa-file-lines nav-icon text-blue"></i>
-                                <span>Documents</span>
-                            </a>
-                        </li>
-                        <li class="nav-item" data-filter="image">
-                            <a href="#" class="nav-link">
-                                <i class="fas fa-image nav-icon text-green"></i>
-                                <span>Images & Photos</span>
-                            </a>
-                        </li>
-                        <li class="nav-item" data-filter="media">
-                            <a href="#" class="nav-link">
-                                <i class="fas fa-film nav-icon text-purple"></i>
-                                <span>Audio & Videos</span>
-                            </a>
-                        </li>
-                        <li class="nav-item" data-filter="archive">
-                            <a href="#" class="nav-link">
-                                <i class="fas fa-box-archive nav-icon text-orange"></i>
-                                <span>Archives & Zip</span>
-                            </a>
-                        </li>
-                    </ul>
-                </div>
-
-                <div class="nav-section">
-                    <span class="nav-section-title">SYSTEM</span>
-                    <ul class="nav-list">
-                        <li class="nav-item" data-view="trash">
-                            <a href="#" class="nav-link">
-                                <i class="fas fa-trash-can nav-icon"></i>
-                                <span>Trash Bin</span>
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="pricing.html" class="nav-link highlight-link">
-                                <i class="fas fa-bolt nav-icon"></i>
-                                <span>Upgrade Plan</span>
-                            </a>
-                        </li>
-                    </ul>
-                </div>
-            </nav>
-
-            <!-- Realtime Storage Usage Meter -->
-            <div class="sidebar-storage-widget glass-card">
-                <div class="widget-header">
-                    <i class="fas fa-database widget-icon"></i>
-                    <span>Storage Status</span>
-                </div>
-                <div class="storage-bar-container">
-                    <div class="storage-bar-fill" id="storageMeterFill" style="width: 10%;"></div>
-                </div>
-                <div class="storage-meta">
-                    <span id="storageUsedText">0 MB</span> / <span id="storageTotalText">5 GB</span>
-                </div>
-                <div class="tier-indicator">
-                    <span class="tier-badge" id="userTierBadge">FREE TIER</span>
-                </div>
-                <a href="pricing.html" class="btn btn-outline btn-block mt-2">Get More Storage</a>
-            </div>
-        </aside>
-
-        <!-- MAIN DASHBOARD CONTENT AREA -->
-        <main class="main-dashboard">
-            
-            <!-- TOP APP HEADER -->
-            <header class="top-navbar glass-card">
-                <!-- Mobile Navigation Toggle -->
-                <button class="mobile-menu-btn" id="mobileMenuToggle">
-                    <i class="fas fa-bars"></i>
-                </button>
-
-                <!-- Global Search Bar -->
-                <div class="search-container">
-                    <i class="fas fa-magnifying-glass search-icon"></i>
-                    <input type="text" id="globalSearchInput" placeholder="Search files, documents, and folders..." autocomplete="off">
-                    <button class="search-clear-btn" id="searchClearBtn" style="display: none;">
-                        <i class="fas fa-xmark"></i>
-                    </button>
-                    <!-- Quick Filter Dropdown -->
-                    <div class="search-filter-dropdown" id="searchFilterDropdown">
-                        <div class="filter-option active" data-type="all">All Types</div>
-                        <div class="filter-option" data-type="pdf">PDF Documents</div>
-                        <div class="filter-option" data-type="image">Images</div>
-                        <div class="filter-option" data-type="zip">Archives</div>
-                    </div>
-                </div>
-
-                <!-- Action Controls & User Avatar -->
-                <div class="header-actions">
-                    <!-- Notification Bell -->
-                    <div class="action-item dropdown-wrapper">
-                        <button class="icon-btn" id="notificationBtn" aria-label="Notifications">
-                            <i class="fas fa-bell"></i>
-                            <span class="notification-dot"></span>
-                        </button>
-                        <div class="dropdown-menu glass-card notification-menu" id="notificationDropdown">
-                            <div class="dropdown-header">
-                                <h4>System Alerts</h4>
-                                <span class="mark-read">Clear All</span>
-                            </div>
-                            <div class="notification-list">
-                                <div class="notification-item">
-                                    <i class="fas fa-circle-check text-green"></i>
-                                    <div class="notif-content">
-                                        <p>Account synchronized with Firebase.</p>
-                                        <small>Just now</small>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Layout View Switcher (Grid vs List) -->
-                    <div class="view-toggle-group">
-                        <button class="view-btn active" id="viewGridBtn" title="Grid View">
-                            <i class="fas fa-border-all"></i>
-                        </button>
-                        <button class="view-btn" id="viewListBtn" title="List View">
-                            <i class="fas fa-list"></i>
-                        </button>
-                    </div>
-
-                    <!-- User Profile Avatar -->
-                    <div class="user-profile-trigger" id="profileTrigger">
-                        <div class="avatar-circle" id="userAvatarInitials">SP</div>
-                        <div class="user-info-mini">
-                            <span class="user-name-display" id="userNameHeader">Shiven Panwar</span>
-                            <span class="user-role-display">CEO / Admin</span>
-                        </div>
-                        <i class="fas fa-chevron-down arrow-icon"></i>
-                    </div>
-                </div>
-            </header>
-
-            <!-- WORKSPACE BODY AREA -->
-            <div class="workspace-body">
-                
-                <!-- TOP BANNER (FESTIVAL / WELCOME PROMO) -->
-                <section class="banner-section glass-card" id="welcomeBanner">
-                    <div class="banner-content">
-                        <span class="banner-tag"><i class="fas fa-sparkles"></i> Welcome to Zulora AI Drive</span>
-                        <h2>Manage & Secure Enterprise Files Seamlessly!</h2>
-                        <p>Enjoy blazing-fast local processing combined with Firebase security and cloud storage sync.</p>
-                    </div>
-                    <div class="banner-actions">
-                        <a href="pricing.html" class="btn btn-primary"><i class="fas fa-rocket"></i> Explore Plans</a>
-                        <button class="btn btn-glass" id="dismissBannerBtn"><i class="fas fa-xmark"></i> Dismiss</button>
-                    </div>
-                </section>
-
-                <!-- SECTION HEADER (Current Folder / Action Strip) -->
-                <div class="section-toolbar">
-                    <div class="breadcrumb-container">
-                        <h2 class="view-title" id="currentViewTitle">My Drive</h2>
-                        <span class="file-count-label" id="fileCountSummary">Loading items...</span>
-                    </div>
-
-                    <div class="toolbar-actions">
-                        <div class="sort-dropdown-wrapper">
-                            <select id="sortBySelect" class="form-select">
-                                <option value="name">Sort by Name</option>
-                                <option value="date" selected>Sort by Date Uploaded</option>
-                                <option value="size">Sort by File Size</option>
-                            </select>
-                        </div>
-                        <button class="btn btn-outline btn-sm" id="refreshDriveBtn">
-                            <i class="fas fa-rotate"></i> Sync
-                        </button>
-                    </div>
-                </div>
-
-                <!-- MAIN FILE CONTAINER GRID/LIST -->
-                <section class="files-container">
-                    
-                    <!-- Loading Skeleton State -->
-                    <div class="loading-state-wrapper" id="loadingState" style="display: none;">
-                        <div class="spinner-ring"></div>
-                        <p>Synchronizing files from server...</p>
-                    </div>
-
-                    <!-- Empty State View -->
-                    <div class="empty-state-card glass-card" id="emptyState" style="display: none;">
-                        <div class="empty-icon-wrapper">
-                            <i class="fas fa-folder-open"></i>
-                        </div>
-                        <h3>No Files Found in Drive</h3>
-                        <p>Click "New Upload" or drag & drop files here to upload them to your Zulora cloud storage.</p>
-                        <button class="btn btn-primary" id="emptyStateUploadBtn">
-                            <i class="fas fa-cloud-arrow-up"></i> Upload Your First File
-                        </button>
-                    </div>
-
-                    <!-- Dynamic Render Grid View -->
-                    <div class="file-grid-layout" id="mainFileGrid">
-                        <!-- Dynamic JS renders elements here -->
-                    </div>
-
-                </section>
-            </div>
-        </main>
-    </div>
-
-    <!-- HIDDEN INPUT FOR UPLOADS -->
-    <input type="file" id="globalFileInput" multiple style="display: none;" />
-
-    <!-- MODAL: UPLOAD PROGRESS DIALOG -->
-    <div class="modal-overlay" id="uploadModal">
-        <div class="modal-card glass-card">
-            <div class="modal-header">
-                <h3><i class="fas fa-cloud-arrow-up text-azure"></i> Uploading Files</h3>
-                <button class="modal-close-btn" id="closeUploadModal"><i class="fas fa-xmark"></i></button>
-            </div>
-            <div class="modal-body">
-                <div class="upload-progress-item">
-                    <div class="file-meta">
-                        <span class="uploading-file-name" id="uploadingFileName">file_name.png</span>
-                        <span class="uploading-file-percentage" id="uploadPercent">0%</span>
-                    </div>
-                    <div class="progress-bar">
-                        <div class="progress-fill" id="uploadProgressFill" style="width: 0%;"></div>
-                    </div>
-                </div>
-            </div>
+    <main class="main">
+      <header class="topbar">
+        <h1 id="viewTitle">My Drive</h1>
+        <div class="user-menu">
+          <div id="userAvatar" class="avatar" aria-hidden="true">ZD</div>
+          <span id="userName" class="user-name">Loading…</span>
+          <button id="signOutButton" class="button ghost small" type="button" title="Sign out"><i class="fa-solid fa-arrow-right-from-bracket"></i><span class="user-name">Sign out</span></button>
         </div>
-    </div>
+      </header>
 
-    <!-- MODAL: PROFILE & ACCOUNT CUSTOMIZATION -->
-    <div class="modal-overlay" id="profileModal">
-        <div class="modal-card glass-card modal-medium">
-            <div class="modal-header">
-                <h3><i class="fas fa-user-gear text-azure"></i> Profile Settings</h3>
-                <button class="modal-close-btn" id="closeProfileModal"><i class="fas fa-xmark"></i></button>
-            </div>
-            <div class="modal-body">
-                <form id="profileUpdateForm">
-                    <div class="avatar-edit-wrapper">
-                        <div class="avatar-large" id="modalAvatarPreview">SP</div>
-                        <div class="avatar-info">
-                            <h4 id="modalUserName">Shiven Panwar</h4>
-                            <p id="modalUserEmail">shivenpanwar412@gmail.com</p>
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="inputDisplayName">Display Name</label>
-                        <input type="text" id="inputDisplayName" class="form-input" value="Shiven Panwar">
-                    </div>
-
-                    <div class="form-group">
-                        <label>Registered Email</label>
-                        <input type="email" class="form-input" value="shivenpanwar412@gmail.com" disabled readonly>
-                        <small class="form-help">Contact system admin to change primary email.</small>
-                    </div>
-
-                    <div class="form-group">
-                        <label>Official Helpline Support</label>
-                        <input type="text" class="form-input" value="+91 6395211325" disabled readonly>
-                    </div>
-
-                    <div class="modal-footer-actions">
-                        <button type="button" class="btn btn-glass" id="cancelProfileBtn">Cancel</button>
-                        <button type="submit" class="btn btn-primary" id="saveProfileBtn">Save Customizations</button>
-                    </div>
-                </form>
-
-                <hr class="divider">
-
-                <div class="danger-zone">
-                    <button class="btn btn-danger btn-block" id="modalLogoutBtn">
-                        <i class="fas fa-arrow-right-from-bracket"></i> Sign Out of Account
-                    </button>
-                </div>
-            </div>
+      <section class="hero" aria-label="Account summary">
+        <div>
+          <p class="eyebrow">Your private workspace</p>
+          <h2>Everything you upload stays yours.</h2>
+          <p>Account ID: <span id="accountId" class="account-id">—</span></p>
         </div>
-    </div>
+        <a class="button" href="pricing.html"><i class="fa-solid fa-bolt"></i> Get more storage</a>
+      </section>
 
-    <!-- MAIN APP SCRIPT INCLUSION -->
-    <script type="module" src="script.js"></script>
+      <section class="drive-toolbar" aria-label="File controls">
+        <label class="search" for="searchInput"><i class="fa-solid fa-magnifying-glass"></i><input id="searchInput" type="search" placeholder="Search your files" autocomplete="off"></label>
+        <select id="sortSelect" class="toolbar-select" aria-label="Sort files">
+          <option value="recent">Recently added</option>
+          <option value="name">Name</option>
+          <option value="size">File size</option>
+        </select>
+      </section>
+
+      <section id="dropZone" class="upload-drop" aria-label="Upload files">
+        <div>
+          <strong>Drop files here to upload</strong>
+          <p>or choose files from your device. Each upload is checked against your quota.</p>
+          <button id="browseButton" class="button ghost small" type="button">Browse files</button>
+        </div>
+      </section>
+
+      <section id="uploadProgress" class="progress-panel" hidden aria-live="polite">
+        <div class="progress-header"><span id="uploadFileName">Uploading…</span><strong id="uploadPercent">0%</strong></div>
+        <div class="progress-track"><span id="uploadProgressBar"></span></div>
+      </section>
+
+      <section id="fileGrid" class="file-grid" aria-live="polite"></section>
+      <section id="emptyState" class="empty" hidden><i class="fa-regular fa-folder-open"></i><strong>No files here yet</strong><p>Upload a document, image, audio file, or video to get started.</p></section>
+
+      <section id="adminPanel" class="admin-panel" hidden aria-labelledby="admin-title">
+        <p class="eyebrow">Super admin</p>
+        <h2 id="admin-title">Drive operations</h2>
+        <p class="muted">Server-wide data is available only to zulora.help@gmail.com.</p>
+        <div id="adminSummary" class="admin-summary"></div>
+        <h3>Users and storage quotas</h3>
+        <div class="admin-list"><table><thead><tr><th>User</th><th>Account</th><th>Used</th><th>Plan</th><th>Quota control</th></tr></thead><tbody id="adminUsers"></tbody></table></div>
+        <h3>Server file structure</h3>
+        <div class="admin-list"><table><thead><tr><th>Storage folder</th><th>File</th><th>Size</th><th>Uploaded</th></tr></thead><tbody id="adminFiles"></tbody></table></div>
+        <h3>Upgrade requests</h3>
+        <div class="admin-list"><table><thead><tr><th>User</th><th>Plan</th><th>Reference</th><th>Requested</th><th>Decision</th></tr></thead><tbody id="adminRequests"></tbody></table></div>
+      </section>
+    </main>
+  </div>
+
+  <div id="previewModal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="previewTitle">
+    <section class="modal-card">
+      <div class="modal-header"><div><p id="previewMeta" class="eyebrow">File preview</p><h2 id="previewTitle">Preview</h2></div><button class="icon-button" data-close-modal="previewModal" type="button" aria-label="Close preview"><i class="fa-solid fa-xmark"></i></button></div>
+      <div id="previewContent" class="preview-content"></div>
+      <div class="modal-actions">
+        <button id="downloadButton" class="button" type="button"><i class="fa-solid fa-download"></i> Download</button>
+        <button id="renameButton" class="button ghost" type="button"><i class="fa-solid fa-pen"></i> Rename</button>
+        <button id="deleteButton" class="button danger" type="button"><i class="fa-solid fa-trash"></i> Delete</button>
+      </div>
+    </section>
+  </div>
+  <div id="toast" class="toast" hidden role="status" aria-live="polite"></div>
+  <script type="module" src="script.js"></script>
 </body>
 </html>
