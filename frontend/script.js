@@ -94,6 +94,7 @@ async function getToken() {
 async function api(path, options = {}) {
   const headers = new Headers(options.headers || {});
   headers.set('Authorization', `Bearer ${await getToken()}`);
+  headers.set('Bypass-Tunnel-Reminder', 'true');
   if (options.body && !(options.body instanceof FormData) && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
   let response;
   try {
@@ -135,7 +136,10 @@ async function authenticatedBlob(file) {
   let response;
   try {
     response = await fetch(`${API_BASE_URL}/api/files/${encodeURIComponent(file.id)}/content`, {
-      headers: { Authorization: `Bearer ${await getToken()}` }
+      headers: {
+        Authorization: `Bearer ${await getToken()}`,
+        'Bypass-Tunnel-Reminder': 'true'
+      }
     });
   } catch (error) {
     throw new Error(`Cannot reach the Zulora Drive server at ${API_BASE_URL}.`);
@@ -308,6 +312,7 @@ function setupDrivePage() {
       const request = new XMLHttpRequest();
       request.open('POST', `${API_BASE_URL}/api/files`);
       request.setRequestHeader('Authorization', `Bearer ${token}`);
+      request.setRequestHeader('Bypass-Tunnel-Reminder', 'true');
       request.upload.onprogress = (event) => { if (event.lengthComputable) setProgress(file, Math.round((event.loaded / event.total) * 100)); };
       request.onerror = () => reject(new Error('Network error during upload.'));
       request.onload = () => {
