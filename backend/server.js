@@ -162,7 +162,7 @@ app.use(helmet({
 }));
 app.use(cors({
   origin: '*',
-  methods: ['GET', 'POST', 'PATCH', 'DELETE'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Authorization', 'Content-Type', 'Bypass-Tunnel-Reminder'],
   maxAge: 86400
 }));
