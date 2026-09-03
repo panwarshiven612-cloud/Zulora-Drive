@@ -9,6 +9,8 @@ import {
   signOut
 } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js';
 
+const API_BASE_URL = "https://solid-signs-build.loca.lt";
+
 const firebaseConfig = {
   apiKey: 'AIzaSyBGOtawcfRqXTm7jw5P3DB0qhJCUTmfyDc',
   authDomain: 'zulora-drive.firebaseapp.com',
@@ -23,10 +25,6 @@ const auth = getAuth(firebaseApp);
 const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: 'select_account' });
 
-const API_BASE = String(
-  window.ZULORA_API_BASE_URL || document.querySelector('meta[name="zulora-api-base"]')?.content ||
-  (window.location.protocol === 'file:' ? 'https://breezy-bushes-work.loca.lt' : window.location.origin)
-).replace(/\/$/, '');
 const PLANS = {
   starter: { label: 'Starter', amount: 0, storage: 10 },
   storage_lite: { label: 'Storage Lite', amount: 70, storage: 50 },
@@ -41,6 +39,7 @@ let currentProfile = null;
 let previewUrl = null;
 let selectedFile = null;
 let toastTimer = null;
+let profileBootstrapPromise = null;
 
 function $(selector, parent = document) { return parent.querySelector(selector); }
 function $all(selector, parent = document) { return [...parent.querySelectorAll(selector)]; }
@@ -94,28 +93,51 @@ async function api(path, options = {}) {
   const headers = new Headers(options.headers || {});
   headers.set('Authorization', `Bearer ${await getToken()}`);
   if (options.body && !(options.body instanceof FormData) && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
-  const response = await fetch(`${API_BASE}${path}`, { ...options, headers });
+  let response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, { ...options, headers });
+  } catch (error) {
+    throw new Error(`Cannot reach the Zulora Drive server at ${API_BASE_URL}. Confirm that the localtunnel process and backend are running.`);
+  }
   if (response.status === 204) return null;
   const contentType = response.headers.get('content-type') || '';
   const payload = contentType.includes('application/json') ? await response.json() : null;
-  if (!response.ok) throw new Error(payload?.error || 'The request could not be completed.');
+  if (!response.ok) throw new Error(payload?.error || `Zulora Drive API request failed (${response.status}).`);
   return payload;
 }
 
 async function bootstrapUser() {
   if (!auth.currentUser) throw new Error('Please sign in to continue.');
-  const data = await api('/api/users/me/bootstrap', {
-    method: 'POST',
-    body: JSON.stringify({ displayName: auth.currentUser.displayName || '', photoURL: auth.currentUser.photoURL || '' })
-  });
+  if (currentProfile) return currentProfile;
+  if (!profileBootstrapPromise) {
+    profileBootstrapPromise = api('/api/users/me/bootstrap', {
+      method: 'POST',
+      body: JSON.stringify({ displayName: auth.currentUser.displayName || '', photoURL: auth.currentUser.photoURL || '' })
+    })
+      .then((data) => {
+        currentProfile = data.profile;
+        return currentProfile;
+      })
+      .finally(() => { profileBootstrapPromise = null; });
+  }
+  return profileBootstrapPromise;
+}
+
+async function refreshProfile() {
+  const data = await api('/api/users/me');
   currentProfile = data.profile;
   return currentProfile;
 }
 
 async function authenticatedBlob(file) {
-  const response = await fetch(`${API_BASE}/api/files/${encodeURIComponent(file.id)}/content`, {
-    headers: { Authorization: `Bearer ${await getToken()}` }
-  });
+  let response;
+  try {
+    response = await fetch(`${API_BASE_URL}/api/files/${encodeURIComponent(file.id)}/content`, {
+      headers: { Authorization: `Bearer ${await getToken()}` }
+    });
+  } catch (error) {
+    throw new Error(`Cannot reach the Zulora Drive server at ${API_BASE_URL}.`);
+  }
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
     throw new Error(body.error || 'Unable to retrieve this file.');
@@ -143,16 +165,32 @@ function fileIcon(file) {
 async function setupLoginPage() {
   const button = $('#googleSignInButton');
   const message = $('#authMessage');
+  let redirectPromise = null;
   if (!button) return;
   try { await setPersistence(auth, browserLocalPersistence); } catch (error) { console.warn('Unable to set auth persistence.', error); }
+
+  const openDrive = () => {
+    if (!redirectPromise) {
+      redirectPromise = (async () => {
+        button.disabled = true;
+        message.textContent = 'Opening your secure drive…';
+        await bootstrapUser();
+        window.location.replace('index.html');
+      })().catch((error) => {
+        redirectPromise = null;
+        button.disabled = false;
+        throw error;
+      });
+    }
+    return redirectPromise;
+  };
 
   button.addEventListener('click', async () => {
     button.disabled = true;
     message.textContent = '';
     try {
       await signInWithPopup(auth, googleProvider);
-      await bootstrapUser();
-      window.location.assign('index.html');
+      await openDrive();
     } catch (error) {
       console.error(error);
       message.textContent = error.code === 'auth/popup-closed-by-user' ? 'Sign-in was cancelled.' : (error.message || 'Google sign-in failed. Please try again.');
@@ -162,11 +200,8 @@ async function setupLoginPage() {
   onAuthStateChanged(auth, async (user) => {
     currentUser = user;
     if (!user) return;
-    button.disabled = true;
-    message.textContent = 'Opening your secure drive…';
     try {
-      await bootstrapUser();
-      window.location.replace('index.html');
+      await openDrive();
     } catch (error) {
       message.textContent = error.message || 'Your account could not be initialized.';
       button.disabled = false;
@@ -240,7 +275,7 @@ function setupDrivePage() {
       const form = new FormData();
       form.append('file', file, file.name);
       const request = new XMLHttpRequest();
-      request.open('POST', `${API_BASE}/api/files`);
+      request.open('POST', `${API_BASE_URL}/api/files`);
       request.setRequestHeader('Authorization', `Bearer ${token}`);
       request.upload.onprogress = (event) => { if (event.lengthComputable) setProgress(file, Math.round((event.loaded / event.total) * 100)); };
       request.onerror = () => reject(new Error('Network error during upload.'));
@@ -264,8 +299,7 @@ function setupDrivePage() {
         state.files.unshift(result);
       }
       setProgress(queue[queue.length - 1], 100);
-      const userData = await api('/api/users/me');
-      currentProfile = userData.profile;
+      await refreshProfile();
       renderProfile();
       render();
       showToast(`${queue.length} file${queue.length === 1 ? '' : 's'} uploaded securely.`);
@@ -374,8 +408,7 @@ function setupDrivePage() {
     try {
       await api(`/api/files/${encodeURIComponent(selectedFile.id)}`, { method: 'DELETE' });
       state.files = state.files.filter((file) => file.id !== selectedFile.id);
-      const userData = await api('/api/users/me');
-      currentProfile = userData.profile;
+      await refreshProfile();
       renderProfile(); render(); closeModal('previewModal'); showToast('File deleted.');
     } catch (error) { showToast(error.message, true); }
   });
