@@ -146,13 +146,6 @@ try {
 
 fs.mkdirSync(UPLOAD_ROOT, { recursive: true });
 
-const configuredOrigins = (process.env.CORS_ORIGINS || '')
-  .split(',').map((origin) => origin.trim()).filter(Boolean);
-const developmentOrigins = new Set([
-  'http://localhost:5000', 'http://localhost:5500',
-  'http://127.0.0.1:5000', 'http://127.0.0.1:5500'
-]);
-
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
   contentSecurityPolicy: {
@@ -162,19 +155,15 @@ app.use(helmet({
       styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com', 'https://cdnjs.cloudflare.com'],
       fontSrc: ["'self'", 'https://fonts.gstatic.com', 'https://cdnjs.cloudflare.com', 'data:'],
       imgSrc: ["'self'", 'data:', 'blob:', 'https:'],
-      connectSrc: ["'self'", 'https://identitytoolkit.googleapis.com', 'https://securetoken.googleapis.com', 'https://www.googleapis.com', 'https://firestore.googleapis.com', 'https://zulora-drive-api.loca.lt'],
+      connectSrc: ["'self'", 'https://identitytoolkit.googleapis.com', 'https://securetoken.googleapis.com', 'https://www.googleapis.com', 'https://firestore.googleapis.com', 'https://zulora-drive-backend.onrender.com'],
       frameSrc: ["'self'", 'https://accounts.google.com']
     }
   }
 }));
 app.use(cors({
-  origin(origin, callback) {
-    if (!origin || configuredOrigins.includes('*') || configuredOrigins.includes(origin) ||
-      (process.env.NODE_ENV !== 'production' && developmentOrigins.has(origin))) return callback(null, true);
-    return callback(new ApiError(403, 'This origin is not allowed to use the API.', 'ORIGIN_FORBIDDEN'));
-  },
+  origin: '*',
   methods: ['GET', 'POST', 'PATCH', 'DELETE'],
-  allowedHeaders: ['Authorization', 'Content-Type'],
+  allowedHeaders: ['Authorization', 'Content-Type', 'Bypass-Tunnel-Reminder'],
   maxAge: 86400
 }));
 app.use(express.json({ limit: '100kb' }));
