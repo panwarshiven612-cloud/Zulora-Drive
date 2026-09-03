@@ -14,7 +14,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const multer = require('multer');
-const { applicationDefault, cert, getApps, initializeApp } = require('firebase-admin/app');
+const { cert, getApps, initializeApp } = require('firebase-admin/app');
 const { getAuth } = require('firebase-admin/auth');
 const { FieldValue, getFirestore } = require('firebase-admin/firestore');
 const fs = require('fs');
@@ -117,25 +117,13 @@ function planFromKey(key) {
 }
 
 // Firebase Admin is deliberately required for authenticated API endpoints.
-// Set FIREBASE_SERVICE_ACCOUNT_JSON or place a service-account JSON beside this file.
 let db;
 let firebaseReady = false;
 try {
-  let credential;
-  if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
-    credential = cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON));
-  } else {
-    const keyFileName = fs.readdirSync(__dirname).find((fileName) => {
-      const lowerName = fileName.toLowerCase();
-      return lowerName.endsWith('.json') &&
-        (lowerName.includes('serviceaccount') || lowerName.includes('firebase-adminsdk'));
-    });
-    if (keyFileName) {
-      const keyFile = path.join(__dirname, keyFileName);
-      credential = cert(require(keyFile));
-    } else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) credential = applicationDefault();
-  }
-  if (!credential) throw new Error('No Firebase Admin credential was configured.');
+  const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT
+    ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
+    : require('./serviceaccountkey.json');
+  const credential = cert(serviceAccount);
   if (!getApps().length) initializeApp({ credential, storageBucket: 'zulora-drive.firebasestorage.app' });
   db = getFirestore();
   firebaseReady = true;
