@@ -9,7 +9,7 @@ import {
   signOut
 } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js';
 
-const API_BASE_URL = "https://solid-signs-build.loca.lt";
+const API_BASE_URL = "https://zulora-drive-api.loca.lt";
 
 const firebaseConfig = {
   apiKey: 'AIzaSyBGOtawcfRqXTm7jw5P3DB0qhJCUTmfyDc',
