@@ -6,6 +6,8 @@ import {
   setPersistence,
   browserLocalPersistence,
   signInWithPopup,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
   signOut
 } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js';
 
@@ -162,49 +164,78 @@ function fileIcon(file) {
   return 'fa-regular fa-file-lines';
 }
 
-async function setupLoginPage() {
+function firebaseMessage(error) {
+  const messages = {
+    'auth/invalid-credential': 'That email or password is incorrect.',
+    'auth/email-already-in-use': 'An account already exists for this email.',
+    'auth/weak-password': 'Use a password with at least 6 characters.',
+    'auth/invalid-email': 'Enter a valid email address.',
+    'auth/popup-closed-by-user': 'Sign-in was cancelled.'
+  };
+  return messages[error.code] || error.message || 'Authentication failed. Please try again.';
+}
+
+function setupAuthInterface({ redirectToDrive = false } = {}) {
   const button = $('#googleSignInButton');
   const message = $('#authMessage');
-  let redirectPromise = null;
-  if (!button) return;
-  try { await setPersistence(auth, browserLocalPersistence); } catch (error) { console.warn('Unable to set auth persistence.', error); }
-
-  const openDrive = () => {
-    if (!redirectPromise) {
-      redirectPromise = (async () => {
-        button.disabled = true;
-        message.textContent = 'Opening your secure drive…';
-        await bootstrapUser();
-        window.location.replace('index.html');
-      })().catch((error) => {
-        redirectPromise = null;
-        button.disabled = false;
-        throw error;
-      });
-    }
-    return redirectPromise;
+  const form = $('#emailAuthForm');
+  const authModal = $('#authModal');
+  if (!button || !message) return;
+  let mode = 'signin';
+  const setMessage = (text) => { message.textContent = text; };
+  const setMode = (nextMode) => {
+    mode = nextMode;
+    $all('[data-auth-mode]').forEach((tab) => tab.classList.toggle('active', tab.dataset.authMode === mode));
+    const submit = $('#emailAuthButton');
+    if (submit) submit.textContent = mode === 'register' ? 'Create my free account' : 'Sign in securely';
+    setMessage('');
   };
-
+  const finishAuth = async () => {
+    currentUser = auth.currentUser;
+    await bootstrapUser();
+    if (redirectToDrive) window.location.replace('index.html');
+    else closeModal('authModal');
+  };
+  $all('[data-auth-mode]').forEach((tab) => tab.addEventListener('click', () => setMode(tab.dataset.authMode)));
+  $all('[data-close-modal]').forEach((closeButton) => closeButton.addEventListener('click', () => closeModal(closeButton.dataset.closeModal)));
+  $('#landingCtaButton')?.addEventListener('click', () => showModal('authModal'));
+  $('#landingSignInButton')?.addEventListener('click', () => showModal('authModal'));
   button.addEventListener('click', async () => {
     button.disabled = true;
+    setMessage('Connecting to Google…');
     message.textContent = '';
     try {
       await signInWithPopup(auth, googleProvider);
-      await openDrive();
+      await finishAuth();
     } catch (error) {
       console.error(error);
-      message.textContent = error.code === 'auth/popup-closed-by-user' ? 'Sign-in was cancelled.' : (error.message || 'Google sign-in failed. Please try again.');
+      setMessage(firebaseMessage(error));
     } finally { button.disabled = false; }
   });
+  form?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const submit = $('#emailAuthButton');
+    submit.disabled = true;
+    setMessage(mode === 'register' ? 'Creating your secure drive…' : 'Signing you in…');
+    try {
+      const email = $('#authEmail').value.trim();
+      const password = $('#authPassword').value;
+      if (mode === 'register') await createUserWithEmailAndPassword(auth, email, password);
+      else await signInWithEmailAndPassword(auth, email, password);
+      await finishAuth();
+    } catch (error) {
+      setMessage(firebaseMessage(error));
+    } finally { submit.disabled = false; }
+  });
+  setPersistence(auth, browserLocalPersistence).catch((error) => console.warn('Unable to set auth persistence.', error));
+}
 
+function setupLoginPage() {
+  setupAuthInterface({ redirectToDrive: true });
   onAuthStateChanged(auth, async (user) => {
     currentUser = user;
-    if (!user) return;
-    try {
-      await openDrive();
-    } catch (error) {
-      message.textContent = error.message || 'Your account could not be initialized.';
-      button.disabled = false;
+    if (user) {
+      try { await bootstrapUser(); window.location.replace('index.html'); } catch (error) { $('#authMessage').textContent = error.message; }
     }
   });
 }
@@ -458,7 +489,15 @@ function setupDrivePage() {
 
   onAuthStateChanged(auth, async (user) => {
     currentUser = user;
-    if (!user) { window.location.replace('login.html'); return; }
+    const landing = $('#landingPage');
+    const drive = $('#driveApp');
+    if (!user) {
+      landing.hidden = false;
+      drive.hidden = true;
+      return;
+    }
+    landing.hidden = true;
+    drive.hidden = false;
     try {
       await bootstrapUser();
       renderProfile();
@@ -513,5 +552,5 @@ function setupPricingPage() {
 
 const page = document.body.dataset.page;
 if (page === 'login') setupLoginPage();
-if (page === 'drive') setupDrivePage();
+if (page === 'drive') { setupAuthInterface(); setupDrivePage(); }
 if (page === 'pricing') setupPricingPage();
