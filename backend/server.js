@@ -131,19 +131,28 @@ let firebaseReady = false;
 function getServiceAccountCredentials() {
   let serviceAccount = null;
 
-  // 1. Check for process.env.FIREBASE_SERVICE_ACCOUNT
-  if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-    const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
+  // 1. Check for process.env.FIREBASE_SERVICE_ACCOUNT (and common aliases)
+  const envRaw = process.env.FIREBASE_SERVICE_ACCOUNT
+    || process.env.FIREBASE_SERVICE_ACCOUNT_KEY
+    || process.env.FIREBASE_CREDENTIALS;
+
+  if (envRaw) {
+    let raw = envRaw;
     // 2. Parse it cleanly using JSON.parse() if it's a string
     if (typeof raw === 'string') {
+      let trimmed = raw.trim();
+      // Handle edge case if wrapped in single quotes
+      if (trimmed.startsWith("'") && trimmed.endsWith("'")) {
+        trimmed = trimmed.slice(1, -1).trim();
+      }
       try {
-        serviceAccount = JSON.parse(raw);
+        serviceAccount = JSON.parse(trimmed);
       } catch (parseError) {
         // Fallback: try base64 decode if env var is base64-encoded
         try {
-          serviceAccount = JSON.parse(Buffer.from(raw, 'base64').toString('utf8'));
+          serviceAccount = JSON.parse(Buffer.from(trimmed, 'base64').toString('utf8'));
         } catch {
-          console.warn('Failed to parse FIREBASE_SERVICE_ACCOUNT as JSON:', parseError.message);
+          console.warn('Failed to parse FIREBASE_SERVICE_ACCOUNT as JSON string:', parseError.message);
         }
       }
     } else if (typeof raw === 'object' && raw !== null) {
@@ -156,7 +165,9 @@ function getServiceAccountCredentials() {
     const candidatePaths = [
       path.resolve(__dirname, 'serviceAccountKey.json'),
       path.resolve(__dirname, 'serviceaccountkey.json'),
-      path.resolve(process.cwd(), 'serviceAccountKey.json')
+      path.resolve(process.cwd(), 'serviceAccountKey.json'),
+      '/etc/secrets/serviceAccountKey.json',
+      '/etc/secrets/serviceaccountkey.json'
     ];
 
     for (const filePath of candidatePaths) {
@@ -194,7 +205,7 @@ try {
     firebaseReady = true;
     console.info('Firebase Admin Initialized Successfully!');
   } else {
-    console.warn('Firebase Admin credentials not found. Set FIREBASE_SERVICE_ACCOUNT or provide serviceAccountKey.json.');
+    console.warn('Firebase Admin credentials not found. Set FIREBASE_SERVICE_ACCOUNT in environment or provide serviceAccountKey.json.');
   }
 } catch (error) {
   console.warn(`Firebase Admin unavailable: ${error.message}`);
@@ -219,12 +230,20 @@ app.use(helmet({
 const CORS_ALLOWED_ORIGINS = [
   'https://zulora-drive.vercel.app',
   'http://localhost:3000',
-  'http://localhost:5000'
+  'http://localhost:5000',
+  'http://127.0.0.1:3000'
 ];
 app.use(cors({
   origin(origin, callback) {
     // Allow requests with no origin (server-to-server, curl, mobile apps).
-    if (!origin || CORS_ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
+    if (!origin) return callback(null, true);
+    const normalized = origin.replace(/\/$/, '');
+    if (
+      CORS_ALLOWED_ORIGINS.includes(normalized) ||
+      normalized.endsWith('.vercel.app')
+    ) {
+      return callback(null, true);
+    }
     return callback(new ApiError(403, `Origin ${origin} is not allowed by CORS policy.`, 'CORS_BLOCKED'));
   },
   credentials: true,
