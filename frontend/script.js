@@ -28,10 +28,10 @@ const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: 'select_account' });
 
 const PLANS = {
-  starter: { label: 'Starter', amount: 0, storage: 10 },
-  storage_lite: { label: 'Storage Lite', amount: 70, storage: 50 },
-  business_pro: { label: 'Business Pro', amount: 140, storage: 100 },
-  ultra_max: { label: 'Ultra Max', amount: 240, storage: 200 }
+  starter: { key: 'starter', label: 'Starter', amount: 0, storage: 10 },
+  storage_lite: { key: 'storage_lite', label: 'Storage Lite', amount: 70, storage: 50 },
+  business_pro: { key: 'business_pro', label: 'Business Pro', amount: 140, storage: 100 },
+  ultra_max: { key: 'ultra_max', label: 'Ultra Max', amount: 240, storage: 200 }
 };
 const WHATSAPP = '916395211325';
 const UPI_ID = 'shivenpanwar@fam';
@@ -514,40 +514,211 @@ function setupDrivePage() {
 
 function setupPricingPage() {
   let activePlan = null;
+  let uploadedScreenshot = null;
+
   function upiUri(plan) {
-    const note = `Zulora Drive ${plan.label} | ${currentProfile?.accountId || 'account'}`;
-    return `upi://pay?${new URLSearchParams({ pa: UPI_ID, pn: 'Zulora Drive', am: String(plan.amount), cu: 'INR', tn: note }).toString()}`;
+    return `upi://pay?pa=shivenpanwar@fam&pn=ZuloraDrive&am=${plan.amount}&cu=INR`;
   }
+
+  function getWaMessage(utr) {
+    const userEmail = currentProfile?.email || auth.currentUser?.email || 'user@example.com';
+    const planName = activePlan?.label || 'Storage Plan';
+    const price = activePlan?.amount || 0;
+    const utrVal = utr || '[Your UTR / Transaction ID]';
+    return `Hello Admin! I upgraded to ${planName} (₹${price}). UTR: ${utrVal}, Registered Email: ${userEmail}. Please verify my payment.`;
+  }
+
+  function updateWaPreview() {
+    const previewEl = $('#waMessagePreview');
+    if (!previewEl) return;
+    const utr = $('#utrInput')?.value.trim();
+    previewEl.textContent = getWaMessage(utr);
+  }
+
+  function resetVerificationForm() {
+    const utrInput = $('#utrInput');
+    if (utrInput) utrInput.value = '';
+    uploadedScreenshot = null;
+    const screenshotInput = $('#screenshotInput');
+    if (screenshotInput) screenshotInput.value = '';
+    const preview = $('#screenshotPreview');
+    if (preview) preview.hidden = true;
+    const thumb = $('#screenshotThumb');
+    if (thumb) thumb.src = '';
+    const placeholder = $('#screenshotPlaceholder');
+    if (placeholder) placeholder.hidden = false;
+    updateWaPreview();
+  }
+
   async function openCheckout(planKey) {
-    if (!auth.currentUser) { window.location.assign('login.html'); return; }
+    if (!auth.currentUser) {
+      window.location.assign('login.html');
+      return;
+    }
     try {
       if (!currentProfile) await bootstrapUser();
-      activePlan = PLANS[planKey];
+      activePlan = PLANS[planKey] || { key: planKey, label: planKey, amount: 0, storage: 0 };
       const url = upiUri(activePlan);
+
       $('#checkoutPlan').textContent = `${activePlan.label} · ₹${activePlan.amount}/month · ${activePlan.storage} GB`;
-      $('#checkoutAccount').textContent = currentProfile.accountId;
+      $('#checkoutAccount').textContent = currentProfile.accountId || currentProfile.email;
       $('#upiLink').textContent = url;
       $('#upiAppLink').href = url;
       $('#upiQr').src = `https://api.qrserver.com/v1/create-qr-code/?size=440x440&format=png&data=${encodeURIComponent(url)}`;
-      $('#paymentReference').value = '';
+
+      resetVerificationForm();
       showModal('checkoutModal');
-    } catch (error) { showToast(error.message || 'Sign in before selecting a plan.', true); }
-  }
-  $all('.payment-button').forEach((button) => button.addEventListener('click', () => openCheckout(button.dataset.plan)));
-  $all('[data-close-modal]').forEach((button) => button.addEventListener('click', () => closeModal(button.dataset.closeModal)));
-  $('#confirmPaymentButton').addEventListener('click', async () => {
-    if (!activePlan || !currentProfile) return;
-    const button = $('#confirmPaymentButton');
-    button.disabled = true;
-    try {
-      await api('/api/upgrade-requests', { method: 'POST', body: JSON.stringify({ plan: activePlan.key, paymentReference: $('#paymentReference').value.trim() }) });
-      const text = `Hello Zulora Drive,%0A%0APlease verify my storage upgrade.%0AAccount ID: ${encodeURIComponent(currentProfile.accountId)}%0APlan: ${encodeURIComponent(activePlan.label)}%0AAmount: ₹${activePlan.amount}%0AUPI ID paid to: ${encodeURIComponent(UPI_ID)}%0A%0AI will attach my payment screenshot and transaction ID here.`;
-      window.location.assign(`https://wa.me/${WHATSAPP}?text=${text}`);
+
+      // Trigger UPI intent directly on mobile devices
+      const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+      if (isMobile) {
+        window.location.href = url;
+      }
     } catch (error) {
-      showToast(error.message || 'Unable to submit the upgrade request.', true);
-      button.disabled = false;
+      showToast(error.message || 'Sign in before selecting a plan.', true);
+    }
+  }
+
+  function openVerifyModal() {
+    closeModal('checkoutModal');
+    updateWaPreview();
+    showModal('verifyModal');
+    $('#utrInput')?.focus();
+  }
+
+  function handleScreenshotFile(file) {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      showToast('Please select an image file (PNG, JPG, WEBP).', true);
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      showToast('Screenshot must be 10 MB or smaller.', true);
+      return;
+    }
+    uploadedScreenshot = file;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const thumb = $('#screenshotThumb');
+      if (thumb) thumb.src = event.target.result;
+      const preview = $('#screenshotPreview');
+      if (preview) preview.hidden = false;
+      const placeholder = $('#screenshotPlaceholder');
+      if (placeholder) placeholder.hidden = true;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  $all('.payment-button').forEach((button) => {
+    button.addEventListener('click', () => openCheckout(button.dataset.plan));
+  });
+
+  $all('[data-close-modal]').forEach((button) => {
+    button.addEventListener('click', () => closeModal(button.dataset.closeModal));
+  });
+
+  $('#proceedToVerifyButton')?.addEventListener('click', openVerifyModal);
+
+  $('#backToCheckoutButton')?.addEventListener('click', () => {
+    closeModal('verifyModal');
+    showModal('checkoutModal');
+  });
+
+  $('#utrInput')?.addEventListener('input', updateWaPreview);
+
+  const dropzone = $('#screenshotDropzone');
+  const fileInput = $('#screenshotInput');
+  const removeBtn = $('#screenshotRemove');
+
+  dropzone?.addEventListener('click', (event) => {
+    if (event.target.closest('#screenshotRemove')) return;
+    fileInput?.click();
+  });
+
+  dropzone?.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      fileInput?.click();
     }
   });
+
+  fileInput?.addEventListener('change', (event) => {
+    if (event.target.files?.[0]) handleScreenshotFile(event.target.files[0]);
+  });
+
+  ['dragenter', 'dragover'].forEach((eventName) => {
+    dropzone?.addEventListener(eventName, (event) => {
+      event.preventDefault();
+      dropzone.classList.add('dragover');
+    });
+  });
+
+  ['dragleave', 'drop'].forEach((eventName) => {
+    dropzone?.addEventListener(eventName, (event) => {
+      event.preventDefault();
+      dropzone.classList.remove('dragover');
+    });
+  });
+
+  dropzone?.addEventListener('drop', (event) => {
+    if (event.dataTransfer?.files?.[0]) {
+      handleScreenshotFile(event.dataTransfer.files[0]);
+    }
+  });
+
+  removeBtn?.addEventListener('click', (event) => {
+    event.stopPropagation();
+    uploadedScreenshot = null;
+    if (fileInput) fileInput.value = '';
+    const thumb = $('#screenshotThumb');
+    if (thumb) thumb.src = '';
+    const preview = $('#screenshotPreview');
+    if (preview) preview.hidden = true;
+    const placeholder = $('#screenshotPlaceholder');
+    if (placeholder) placeholder.hidden = false;
+  });
+
+  $('#confirmPaymentButton')?.addEventListener('click', async () => {
+    if (!activePlan) return;
+    const utr = ($('#utrInput')?.value || '').trim();
+    if (!utr) {
+      showToast('Please enter your UTR / Transaction ID before confirming.', true);
+      $('#utrInput')?.focus();
+      return;
+    }
+
+    const button = $('#confirmPaymentButton');
+    button.disabled = true;
+    const originalContent = button.innerHTML;
+    button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Submitting…';
+
+    try {
+      await api('/api/upgrade-requests', {
+        method: 'POST',
+        body: JSON.stringify({
+          plan: activePlan.key,
+          paymentReference: utr
+        })
+      });
+
+      const message = getWaMessage(utr);
+      const waUrl = `https://wa.me/${WHATSAPP}?text=${encodeURIComponent(message)}`;
+      showToast('Upgrade request logged! Opening WhatsApp…');
+
+      window.open(waUrl, '_blank') || window.location.assign(waUrl);
+      closeModal('verifyModal');
+    } catch (error) {
+      showToast(error.message || 'Could not record request in system. Proceeding to WhatsApp…', true);
+      const message = getWaMessage(utr);
+      const waUrl = `https://wa.me/${WHATSAPP}?text=${encodeURIComponent(message)}`;
+      window.open(waUrl, '_blank') || window.location.assign(waUrl);
+      closeModal('verifyModal');
+    } finally {
+      button.disabled = false;
+      button.innerHTML = originalContent;
+    }
+  });
+
   onAuthStateChanged(auth, async (user) => {
     currentUser = user;
     if (!user) return;

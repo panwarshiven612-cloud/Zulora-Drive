@@ -3,152 +3,2348 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Zulora Drive — secure private cloud storage.">
-  <title>Zulora Drive · Private cloud storage</title>
+  <meta name="description" content="Zulora Drive — Secure, Private Cloud Storage with Pearl & Azure Bright Theme.">
+  <title>Zulora Drive · Dashboard</title>
+
+  <!-- Google Fonts: Inter -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <!-- Font Awesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
-  <link rel="stylesheet" href="style.css">
+
+  <style>
+    /* ==========================================================================
+       ZULORA DRIVE — PEARL & AZURE BRIGHT THEME
+       Palette: #FFFFFF Background, #F8FAFC Soft Slate Cards, #0EA5E9 Azure Accents
+       Glassmorphism with refined translucent borders. Zero neon/glowing effects.
+       ========================================================================== */
+    :root {
+      --bg-canvas: #FFFFFF;
+      --bg-surface: #F8FAFC;
+      --bg-surface-glass: rgba(255, 255, 255, 0.88);
+      --bg-card: #FFFFFF;
+      --bg-card-hover: #F1F5F9;
+
+      --azure-primary: #0EA5E9;
+      --azure-hover: #0284C7;
+      --azure-pale: #E0F2FE;
+      --azure-subtle: #F0F9FF;
+      --azure-text: #0369A1;
+
+      --text-main: #0F172A;
+      --text-slate: #475569;
+      --text-muted: #64748B;
+      --text-light: #94A3B8;
+
+      --border-soft: #E2E8F0;
+      --border-subtle: rgba(226, 232, 240, 0.85);
+      --border-active: #7DD3FC;
+
+      --danger: #EF4444;
+      --danger-subtle: #FEE2E2;
+      --danger-hover: #DC2626;
+      --success: #10B981;
+      --success-subtle: #D1FAE5;
+      --warning: #F59E0B;
+      --warning-subtle: #FEF3C7;
+
+      --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.04), 0 1px 2px rgba(15, 23, 42, 0.02);
+      --shadow-md: 0 4px 16px -2px rgba(15, 23, 42, 0.06), 0 2px 6px -1px rgba(15, 23, 42, 0.03);
+      --shadow-lg: 0 14px 34px -4px rgba(15, 23, 42, 0.08), 0 6px 14px -2px rgba(15, 23, 42, 0.04);
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 18px;
+      --radius-xl: 24px;
+      --radius-full: 9999px;
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html {
+      min-height: 100%;
+      font-size: 15px;
+    }
+
+    body {
+      min-height: 100vh;
+      background-color: var(--bg-canvas);
+      color: var(--text-main);
+      font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      overflow-x: hidden;
+    }
+
+    button, input, select, textarea {
+      font: inherit;
+    }
+
+    button {
+      cursor: pointer;
+      border: 0;
+      background: transparent;
+      user-select: none;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    img {
+      max-width: 100%;
+      display: block;
+    }
+
+    [hidden] {
+      display: none !important;
+    }
+
+    /* Glassmorphic Layer Utility */
+    .glass {
+      background: var(--bg-surface-glass);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--border-subtle);
+      box-shadow: var(--shadow-sm);
+    }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      min-height: 38px;
+      padding: 0.55rem 1rem;
+      border-radius: var(--radius-md);
+      font-weight: 600;
+      font-size: 0.88rem;
+      transition: all 0.16s ease;
+      white-space: nowrap;
+    }
+    .btn:disabled {
+      cursor: not-allowed;
+      opacity: 0.55;
+    }
+    .btn-azure {
+      background: var(--azure-primary);
+      color: #FFFFFF;
+      border: 1px solid var(--azure-primary);
+    }
+    .btn-azure:hover:not(:disabled) {
+      background: var(--azure-hover);
+      border-color: var(--azure-hover);
+      box-shadow: var(--shadow-sm);
+    }
+    .btn-ghost {
+      background: #FFFFFF;
+      border: 1px solid var(--border-soft);
+      color: var(--text-slate);
+    }
+    .btn-ghost:hover:not(:disabled) {
+      background: var(--bg-surface);
+      color: var(--text-main);
+      border-color: var(--border-active);
+    }
+    .btn-azure-subtle {
+      background: var(--azure-pale);
+      color: var(--azure-text);
+      border: 1px solid transparent;
+    }
+    .btn-azure-subtle:hover:not(:disabled) {
+      background: #BAE6FD;
+    }
+    .btn-danger {
+      background: var(--danger);
+      color: #FFFFFF;
+      border: 1px solid var(--danger);
+    }
+    .btn-danger:hover:not(:disabled) {
+      background: var(--danger-hover);
+    }
+    .btn-danger-ghost {
+      background: transparent;
+      color: var(--danger);
+      border: 1px solid transparent;
+    }
+    .btn-danger-ghost:hover:not(:disabled) {
+      background: var(--danger-subtle);
+    }
+    .btn-sm {
+      min-height: 32px;
+      padding: 0.35rem 0.75rem;
+      font-size: 0.82rem;
+      border-radius: var(--radius-sm);
+    }
+    .btn-icon {
+      width: 36px;
+      height: 36px;
+      padding: 0;
+      border-radius: var(--radius-md);
+      display: inline-grid;
+      place-items: center;
+      color: var(--text-slate);
+      border: 1px solid var(--border-soft);
+      background: #FFFFFF;
+    }
+    .btn-icon:hover {
+      background: var(--bg-surface);
+      color: var(--azure-primary);
+      border-color: var(--border-active);
+    }
+
+    /* Badges */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.2rem 0.6rem;
+      border-radius: var(--radius-full);
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .badge-azure {
+      background: var(--azure-pale);
+      color: var(--azure-text);
+    }
+    .badge-admin {
+      background: #F3E8FF;
+      color: #7E22CE;
+      border: 1px solid #E9D5FF;
+    }
+    .badge-pro {
+      background: var(--success-subtle);
+      color: #047857;
+    }
+
+    /* ==========================================================================
+       TOP NAVIGATION BAR / HEADER
+       ========================================================================== */
+    .top-header {
+      position: sticky;
+      top: 0;
+      z-index: 40;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1.5rem;
+      height: 68px;
+      padding: 0 1.75rem;
+      background: rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border-soft);
+    }
+
+    .brand-section {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .brand-logo {
+      width: 38px;
+      height: 38px;
+      border-radius: 11px;
+      object-fit: cover;
+      box-shadow: var(--shadow-sm);
+    }
+    .brand-text {
+      display: flex;
+      flex-direction: column;
+    }
+    .brand-title {
+      font-size: 1.15rem;
+      font-weight: 800;
+      letter-spacing: -0.04em;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .brand-title span {
+      color: var(--azure-primary);
+    }
+    .brand-subtitle {
+      font-size: 0.64rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+
+    /* Header Storage Usage Bar */
+    .header-storage {
+      flex: 1;
+      max-width: 380px;
+      padding: 0.5rem 0.9rem;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-soft);
+      border-radius: var(--radius-md);
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+      transition: border-color 0.2s;
+    }
+    .header-storage:hover {
+      border-color: var(--border-active);
+    }
+    .storage-labels {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.76rem;
+    }
+    .storage-label-title {
+      color: var(--text-slate);
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+    .storage-label-title i {
+      color: var(--azure-primary);
+    }
+    .storage-usage-text {
+      font-weight: 700;
+      color: var(--text-main);
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .storage-progress-track {
+      height: 7px;
+      width: 100%;
+      background: #E2E8F0;
+      border-radius: var(--radius-full);
+      overflow: hidden;
+    }
+    .storage-progress-bar {
+      height: 100%;
+      width: 0%;
+      background: var(--azure-primary);
+      border-radius: var(--radius-full);
+      transition: width 0.35s ease, background-color 0.35s ease;
+    }
+
+    /* User Menu in Header */
+    .header-user-section {
+      display: flex;
+      align-items: center;
+      gap: 0.85rem;
+    }
+    .user-profile-card {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      padding: 0.3rem 0.6rem 0.3rem 0.3rem;
+      border-radius: var(--radius-full);
+      background: var(--bg-surface);
+      border: 1px solid var(--border-soft);
+    }
+    .user-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      object-fit: cover;
+      background: var(--azure-pale);
+      color: var(--azure-text);
+      display: grid;
+      place-items: center;
+      font-weight: 700;
+      font-size: 0.8rem;
+    }
+    .user-info-text {
+      display: flex;
+      flex-direction: column;
+      line-height: 1.2;
+      text-align: left;
+    }
+    .user-name {
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--text-main);
+      max-width: 140px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .user-account-id {
+      font-size: 0.68rem;
+      color: var(--text-muted);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* ==========================================================================
+       APP LAYOUT (SIDEBAR + MAIN CANVAS)
+       ========================================================================== */
+    .app-layout {
+      display: grid;
+      grid-template-columns: 260px minmax(0, 1fr);
+      min-height: calc(100vh - 68px);
+    }
+
+    /* Sidebar Navigation */
+    .sidebar {
+      background: var(--bg-surface);
+      border-right: 1px solid var(--border-soft);
+      padding: 1.5rem 1.1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+    .upload-action-box {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .btn-upload-hero {
+      width: 100%;
+      min-height: 44px;
+      background: var(--azure-primary);
+      color: #FFFFFF;
+      border-radius: var(--radius-md);
+      font-weight: 700;
+      font-size: 0.92rem;
+      box-shadow: var(--shadow-sm);
+    }
+    .btn-upload-hero:hover {
+      background: var(--azure-hover);
+    }
+
+    .nav-section {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+    .nav-heading {
+      font-size: 0.68rem;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      padding: 0.5rem 0.75rem 0.25rem;
+    }
+    .nav-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      padding: 0.65rem 0.85rem;
+      border-radius: var(--radius-md);
+      color: var(--text-slate);
+      font-weight: 600;
+      font-size: 0.88rem;
+      transition: all 0.15s ease;
+      text-align: left;
+    }
+    .nav-item-left {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .nav-item i {
+      width: 18px;
+      font-size: 1rem;
+      color: var(--text-light);
+      transition: color 0.15s;
+    }
+    .nav-item:hover {
+      background: #FFFFFF;
+      color: var(--azure-primary);
+    }
+    .nav-item:hover i {
+      color: var(--azure-primary);
+    }
+    .nav-item.active {
+      background: #FFFFFF;
+      color: var(--azure-primary);
+      box-shadow: var(--shadow-sm);
+      border: 1px solid var(--border-soft);
+    }
+    .nav-item.active i {
+      color: var(--azure-primary);
+    }
+    .nav-count-badge {
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 0.1rem 0.45rem;
+      border-radius: var(--radius-full);
+      background: #E2E8F0;
+      color: var(--text-slate);
+    }
+    .nav-item.active .nav-count-badge {
+      background: var(--azure-pale);
+      color: var(--azure-text);
+    }
+
+    /* Sidebar Footer Upgrade Card */
+    .sidebar-footer {
+      margin-top: auto;
+      padding: 1.1rem;
+      background: #FFFFFF;
+      border: 1px solid var(--border-soft);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-sm);
+      display: flex;
+      flex-direction: column;
+      gap: 0.65rem;
+    }
+    .sidebar-footer-title {
+      font-weight: 700;
+      font-size: 0.88rem;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+    }
+    .sidebar-footer-title i {
+      color: var(--azure-primary);
+    }
+    .sidebar-footer-desc {
+      font-size: 0.76rem;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+    /* ==========================================================================
+       MAIN CONTENT DASHBOARD
+       ========================================================================== */
+    .main-content {
+      padding: 1.75rem clamp(1.2rem, 3.5vw, 3rem) 3rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+      max-width: 1400px;
+    }
+
+    /* Dashboard Toolbar */
+    .dashboard-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    .toolbar-left {
+      display: flex;
+      align-items: center;
+      gap: 0.85rem;
+      flex: 1;
+      max-width: 480px;
+    }
+    .search-box {
+      position: relative;
+      width: 100%;
+    }
+    .search-box i {
+      position: absolute;
+      left: 0.9rem;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-light);
+      font-size: 0.9rem;
+      pointer-events: none;
+    }
+    .search-input {
+      width: 100%;
+      height: 40px;
+      padding: 0 0.9rem 0 2.5rem;
+      border: 1px solid var(--border-soft);
+      border-radius: var(--radius-md);
+      background: #FFFFFF;
+      color: var(--text-main);
+      font-size: 0.88rem;
+      outline: 0;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .search-input:focus {
+      border-color: var(--azure-primary);
+      box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.12);
+    }
+
+    .toolbar-right {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+    }
+    .sort-select {
+      height: 40px;
+      padding: 0 2rem 0 0.85rem;
+      border: 1px solid var(--border-soft);
+      border-radius: var(--radius-md);
+      background: #FFFFFF;
+      color: var(--text-slate);
+      font-size: 0.85rem;
+      font-weight: 600;
+      outline: 0;
+      cursor: pointer;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748B'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 0.65rem center;
+      background-size: 1.1rem;
+    }
+    .sort-select:focus {
+      border-color: var(--azure-primary);
+    }
+
+    /* View Switcher (Grid vs List) */
+    .view-toggle-group {
+      display: inline-flex;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-soft);
+      border-radius: var(--radius-md);
+      padding: 0.2rem;
+    }
+    .view-toggle-btn {
+      width: 34px;
+      height: 32px;
+      display: grid;
+      place-items: center;
+      border-radius: 7px;
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      transition: all 0.15s ease;
+    }
+    .view-toggle-btn:hover {
+      color: var(--text-main);
+    }
+    .view-toggle-btn.active {
+      background: #FFFFFF;
+      color: var(--azure-primary);
+      box-shadow: var(--shadow-sm);
+    }
+
+    /* Upload Drag & Drop Zone */
+    .upload-dropzone {
+      padding: 1.6rem;
+      border: 2px dashed #BAE6FD;
+      border-radius: var(--radius-lg);
+      background: var(--azure-subtle);
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+    .upload-dropzone:hover, .upload-dropzone.dragging {
+      border-color: var(--azure-primary);
+      background: #E0F2FE;
+    }
+    .dropzone-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: #FFFFFF;
+      color: var(--azure-primary);
+      display: grid;
+      place-items: center;
+      font-size: 1.25rem;
+      box-shadow: var(--shadow-sm);
+    }
+    .dropzone-text strong {
+      display: block;
+      color: var(--text-main);
+      font-size: 0.95rem;
+    }
+    .dropzone-text p {
+      color: var(--text-muted);
+      font-size: 0.8rem;
+    }
+
+    /* Upload Progress Panel */
+    .upload-progress-panel {
+      padding: 1rem 1.25rem;
+      background: #FFFFFF;
+      border: 1px solid var(--border-soft);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-sm);
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+    .progress-info {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.84rem;
+    }
+    .progress-file-name {
+      font-weight: 600;
+      color: var(--text-main);
+      max-width: 70%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .progress-percentage {
+      font-weight: 700;
+      color: var(--azure-primary);
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .progress-bar-wrapper {
+      height: 6px;
+      background: #E2E8F0;
+      border-radius: var(--radius-full);
+      overflow: hidden;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      width: 0%;
+      background: var(--azure-primary);
+      border-radius: var(--radius-full);
+      transition: width 0.15s linear;
+    }
+
+    /* ==========================================================================
+       FILE MANAGER VIEW — GRID VIEW
+       ========================================================================== */
+    .file-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 1.1rem;
+    }
+    .file-card {
+      position: relative;
+      background: #FFFFFF;
+      border: 1px solid var(--border-soft);
+      border-radius: var(--radius-lg);
+      padding: 0.9rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+      cursor: pointer;
+    }
+    .file-card:hover {
+      transform: translateY(-2px);
+      border-color: var(--border-active);
+      box-shadow: var(--shadow-md);
+    }
+    .file-card-preview-thumb {
+      width: 100%;
+      height: 130px;
+      border-radius: var(--radius-md);
+      background: var(--bg-surface);
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+      position: relative;
+    }
+    .file-card-preview-thumb img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .file-type-icon {
+      font-size: 2.5rem;
+      color: var(--azure-primary);
+    }
+    .star-toggle-btn {
+      position: absolute;
+      top: 0.5rem;
+      right: 0.5rem;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.88);
+      backdrop-filter: blur(8px);
+      display: grid;
+      place-items: center;
+      color: var(--text-light);
+      font-size: 0.9rem;
+      box-shadow: var(--shadow-sm);
+      transition: color 0.15s ease, transform 0.15s ease;
+      z-index: 2;
+    }
+    .star-toggle-btn:hover {
+      transform: scale(1.1);
+      color: var(--warning);
+    }
+    .star-toggle-btn.is-starred {
+      color: var(--warning);
+    }
+    .file-card-info {
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
+    }
+    .file-card-name {
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: var(--text-main);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .file-card-meta {
+      font-size: 0.74rem;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .file-card-actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.4rem;
+      padding-top: 0.5rem;
+      border-top: 1px solid var(--border-soft);
+    }
+
+    /* ==========================================================================
+       FILE MANAGER VIEW — LIST VIEW
+       ========================================================================== */
+    .file-list-container {
+      background: #FFFFFF;
+      border: 1px solid var(--border-soft);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      box-shadow: var(--shadow-sm);
+    }
+    .file-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+      text-align: left;
+    }
+    .file-table th {
+      background: var(--bg-surface);
+      color: var(--text-muted);
+      font-size: 0.72rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 0.8rem 1rem;
+      border-bottom: 1px solid var(--border-soft);
+    }
+    .file-table td {
+      padding: 0.85rem 1rem;
+      border-bottom: 1px solid var(--border-soft);
+      vertical-align: middle;
+      color: var(--text-slate);
+    }
+    .file-table tr:last-child td {
+      border-bottom: 0;
+    }
+    .file-table tbody tr {
+      transition: background-color 0.15s ease;
+      cursor: pointer;
+    }
+    .file-table tbody tr:hover {
+      background-color: var(--bg-surface);
+    }
+    .file-list-name-cell {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+    .file-list-icon {
+      font-size: 1.1rem;
+      color: var(--azure-primary);
+      width: 24px;
+      display: grid;
+      place-items: center;
+    }
+    .file-list-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+
+    /* Empty State */
+    .empty-state {
+      padding: 4rem 1.5rem;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.75rem;
+      color: var(--text-muted);
+    }
+    .empty-icon {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      background: var(--azure-subtle);
+      color: var(--azure-primary);
+      display: grid;
+      place-items: center;
+      font-size: 1.8rem;
+      margin-bottom: 0.5rem;
+    }
+    .empty-state strong {
+      font-size: 1.1rem;
+      color: var(--text-main);
+    }
+    .empty-state p {
+      font-size: 0.85rem;
+      max-width: 320px;
+    }
+
+    /* ==========================================================================
+       SUPER ADMIN PANEL (Visible ONLY for zulora.help@gmail.com)
+       ========================================================================== */
+    .admin-container {
+      margin-top: 2rem;
+      padding: 2rem;
+      border-radius: var(--radius-xl);
+      background: #FFFFFF;
+      border: 2px solid #E0F2FE;
+      box-shadow: var(--shadow-md);
+      display: flex;
+      flex-direction: column;
+      gap: 1.8rem;
+    }
+    .admin-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+      padding-bottom: 1.25rem;
+      border-bottom: 1px solid var(--border-soft);
+    }
+    .admin-header-title {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+    }
+    .admin-header-title h2 {
+      font-size: 1.35rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      color: var(--text-main);
+    }
+
+    /* Admin Metrics Overview Cards */
+    .admin-metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+    }
+    .metric-card {
+      padding: 1.2rem;
+      border-radius: var(--radius-md);
+      background: var(--bg-surface);
+      border: 1px solid var(--border-soft);
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+    .metric-label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .metric-value {
+      font-size: 1.6rem;
+      font-weight: 800;
+      color: var(--text-main);
+      letter-spacing: -0.04em;
+    }
+
+    /* Admin Users Table & Quota Input */
+    .admin-table-wrapper {
+      border: 1px solid var(--border-soft);
+      border-radius: var(--radius-md);
+      overflow-x: auto;
+      background: #FFFFFF;
+    }
+    .quota-input-group {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+    }
+    .quota-number-input {
+      width: 78px;
+      height: 32px;
+      padding: 0 0.45rem;
+      border: 1px solid var(--border-soft);
+      border-radius: var(--radius-sm);
+      font-size: 0.85rem;
+      font-weight: 600;
+      text-align: center;
+      outline: 0;
+    }
+    .quota-number-input:focus {
+      border-color: var(--azure-primary);
+    }
+
+    /* ==========================================================================
+       MODALS & PREVIEW OVERLAYS
+       ========================================================================== */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      background: rgba(15, 23, 42, 0.45);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      display: grid;
+      place-items: center;
+      padding: 1.25rem;
+      overflow-y: auto;
+    }
+    .modal-shell {
+      width: min(100%, 720px);
+      max-height: 90vh;
+      background: #FFFFFF;
+      border-radius: var(--radius-xl);
+      border: 1px solid var(--border-soft);
+      box-shadow: var(--shadow-lg);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .modal-header {
+      padding: 1.2rem 1.5rem;
+      border-bottom: 1px solid var(--border-soft);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+    .modal-title-box h3 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--text-main);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .modal-title-box p {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+    }
+    .modal-body {
+      padding: 1.5rem;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .preview-viewport {
+      min-height: 300px;
+      max-height: 56vh;
+      display: grid;
+      place-items: center;
+      background: var(--bg-surface);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      border: 1px solid var(--border-soft);
+    }
+    .preview-viewport img, .preview-viewport video {
+      max-width: 100%;
+      max-height: 56vh;
+      object-fit: contain;
+    }
+    .preview-viewport audio {
+      width: 80%;
+    }
+    .preview-viewport iframe {
+      width: 100%;
+      height: 56vh;
+      border: 0;
+    }
+    .preview-fallback {
+      text-align: center;
+      padding: 2rem;
+      color: var(--text-muted);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .preview-fallback i {
+      font-size: 2.5rem;
+      color: var(--azure-primary);
+    }
+    .modal-footer {
+      padding: 1rem 1.5rem;
+      border-top: 1px solid var(--border-soft);
+      background: var(--bg-surface);
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 0.65rem;
+    }
+
+    /* Auth Dialog / Overlay for Sign-in */
+    .auth-overlay-card {
+      width: min(100%, 420px);
+      background: #FFFFFF;
+      border-radius: var(--radius-xl);
+      border: 1px solid var(--border-soft);
+      box-shadow: var(--shadow-lg);
+      padding: 2.25rem 2rem;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+    .auth-brand-logo {
+      width: 52px;
+      height: 52px;
+      border-radius: 14px;
+      margin: 0 auto;
+    }
+    .google-btn {
+      width: 100%;
+      height: 44px;
+      border: 1px solid var(--border-soft);
+      border-radius: var(--radius-md);
+      background: #FFFFFF;
+      color: var(--text-main);
+      font-weight: 600;
+      font-size: 0.92rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.65rem;
+      box-shadow: var(--shadow-sm);
+      transition: background 0.15s ease;
+    }
+    .google-btn:hover {
+      background: var(--bg-surface);
+    }
+    .google-btn i {
+      color: #4285F4;
+      font-size: 1.15rem;
+    }
+
+    /* Toast Notification */
+    .toast-box {
+      position: fixed;
+      bottom: 1.5rem;
+      right: 1.5rem;
+      z-index: 120;
+      padding: 0.85rem 1.25rem;
+      border-radius: var(--radius-md);
+      background: #0F172A;
+      color: #FFFFFF;
+      font-size: 0.88rem;
+      font-weight: 600;
+      box-shadow: var(--shadow-lg);
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .toast-box.toast-error {
+      background: var(--danger);
+    }
+    .toast-box.toast-success {
+      background: #047857;
+    }
+
+    /* Responsive Queries */
+    @media (max-width: 900px) {
+      .app-layout {
+        grid-template-columns: 1fr;
+      }
+      .sidebar {
+        display: none;
+      }
+      .top-header {
+        padding: 0 1rem;
+      }
+      .header-storage {
+        display: none;
+      }
+    }
+  </style>
 </head>
-<body data-page="drive">
-  <main id="landingPage" class="landing-page">
-    <header class="marketing-header landing-header">
-      <a class="brand" href="index.html">
-        <img src="https://i.postimg.cc/VL9RBtWh/Elegant-AI-Agency-Logo-for-Zulora-20260208-153446-0000.png" alt="Zulora logo">
-        <span>Zulora Drive<small>PRIVATE CLOUD STORAGE</small></span>
+<body data-page="dashboard">
+
+  <!-- ========================================================================
+       TOP HEADER COMPONENT
+       - Logo & Brand Title
+       - Realtime Storage Usage Bar ("1.2 GB / 10 GB Used")
+       - Google Profile Info & Role Badges
+       ======================================================================== -->
+  <header class="top-header" id="mainHeader">
+    <div class="brand-section">
+      <img src="https://i.postimg.cc/VL9RBtWh/Elegant-AI-Agency-Logo-for-Zulora-20260208-153446-0000.png"
+           alt="Zulora Drive Logo" class="brand-logo">
+      <div class="brand-text">
+        <div class="brand-title">Zulora <span>Drive</span></div>
+        <span class="brand-subtitle">Private Cloud Storage</span>
+      </div>
+    </div>
+
+    <!-- Storage Usage Bar -->
+    <div class="header-storage" id="headerStorageContainer" title="Your current cloud storage allocation">
+      <div class="storage-labels">
+        <span class="storage-label-title">
+          <i class="fa-solid fa-hard-drive"></i>
+          <span>Storage</span>
+        </span>
+        <span class="storage-usage-text" id="headerStorageText">Loading…</span>
+      </div>
+      <div class="storage-progress-track">
+        <div class="storage-progress-bar" id="headerStorageBar"></div>
+      </div>
+    </div>
+
+    <!-- Profile & Actions -->
+    <div class="header-user-section">
+      <a href="pricing.html" class="btn btn-azure btn-sm" id="upgradePlanBtn">
+        <i class="fa-solid fa-bolt"></i> Upgrade Storage
       </a>
-      <button id="landingSignInButton" class="button ghost small" type="button">Sign in / Register</button>
-    </header>
-    <section class="landing-hero" aria-labelledby="landingTitle">
-      <div class="landing-copy">
-        <p class="eyebrow">Private storage, made simple</p>
-        <h1 id="landingTitle">Your files. Your space. <span>Always yours.</span></h1>
-        <p class="landing-lede">A calm, secure home for your documents, photos, videos, and everything you want within reach.</p>
-        <div class="landing-actions">
-          <button id="landingCtaButton" class="button landing-cta" type="button"><i class="fa-solid fa-cloud-arrow-up"></i> Get Free 10 GB Storage</button>
-          <a class="button ghost" href="pricing.html"><i class="fa-solid fa-layer-group"></i> Explore storage plans</a>
+
+      <!-- User Badge / Menu -->
+      <div class="user-profile-card" id="userProfileBadge">
+        <div class="user-avatar" id="headerUserAvatar">ZD</div>
+        <div class="user-info-text">
+          <span class="user-name" id="headerUserName">Guest</span>
+          <span class="user-account-id" id="headerUserAccountId">Connecting…</span>
         </div>
-        <div class="landing-proof"><span><i class="fa-solid fa-shield-halved"></i> Private by default</span><span><i class="fa-solid fa-bolt"></i> Fast uploads</span><span><i class="fa-solid fa-hard-drive"></i> 10 GB free</span></div>
       </div>
-      <div class="landing-preview glass" aria-label="Drive preview">
-        <div class="preview-top"><span class="window-dots"><i></i><i></i><i></i></span><span>My Drive</span><i class="fa-solid fa-ellipsis"></i></div>
-        <div class="preview-storage"><div><span>Personal storage</span><strong>2.4 GB <small>of 10 GB used</small></strong></div><i class="fa-solid fa-chart-simple"></i></div>
-        <div class="preview-files"><div><i class="fa-regular fa-image"></i><span>Weekend photos<small>24 files · 1.8 GB</small></span><b>...</b></div><div><i class="fa-regular fa-file-lines"></i><span>Project notes<small>12 files · 640 MB</small></span><b>...</b></div><div><i class="fa-solid fa-film"></i><span>Team recording<small>3 files · 12 MB</small></span><b>...</b></div></div>
+
+      <button class="btn btn-icon" id="headerSignOutBtn" title="Sign out of Zulora Drive">
+        <i class="fa-solid fa-arrow-right-from-bracket"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- ========================================================================
+       MAIN APP LAYOUT (SIDEBAR + CONTENT CANVAS)
+       ======================================================================== -->
+  <div class="app-layout" id="dashboardAppShell">
+
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar">
+      <div class="upload-action-box">
+        <input type="file" id="filePickerInput" multiple hidden>
+        <button class="btn btn-upload-hero" id="sidebarUploadBtn">
+          <i class="fa-solid fa-cloud-arrow-up"></i> Upload Files
+        </button>
       </div>
-    </section>
-    <section class="landing-features" aria-label="Zulora Drive features"><article><i class="fa-solid fa-lock"></i><h2>Private from the start</h2><p>Every account gets its own protected storage space.</p></article><article><i class="fa-solid fa-arrows-rotate"></i><h2>One place for everything</h2><p>Preview, organize, download, and manage files with ease.</p></article><article><i class="fa-solid fa-chart-pie"></i><h2>Storage that grows</h2><p>Start free and upgrade your quota when you need more.</p></article></section>
-  </main>
 
-  <div id="authModal" class="modal auth-modal" hidden role="dialog" aria-modal="true" aria-labelledby="authTitle">
-    <section class="modal-card auth-modal-card">
-      <div class="modal-header"><div><p class="eyebrow">Welcome to Zulora</p><h2 id="authTitle">Open your private drive</h2></div><button class="icon-button" data-close-modal="authModal" type="button" aria-label="Close sign in dialog"><i class="fa-solid fa-xmark"></i></button></div>
-      <button id="googleSignInButton" class="button google-button wide" type="button"><span class="google-mark" aria-hidden="true"><i class="fa-brands fa-google"></i></span> Continue with Google</button>
-      <div class="auth-divider"><span>or use email</span></div>
-      <div class="auth-tabs" role="tablist"><button class="auth-tab active" data-auth-mode="signin" type="button" role="tab">Sign in</button><button class="auth-tab" data-auth-mode="register" type="button" role="tab">Create account</button></div>
-      <form id="emailAuthForm" class="email-auth-form"><label for="authEmail">Email address</label><input id="authEmail" type="email" autocomplete="email" required placeholder="you@example.com"><label for="authPassword">Password</label><input id="authPassword" type="password" autocomplete="current-password" minlength="6" required placeholder="At least 6 characters"><button id="emailAuthButton" class="button wide" type="submit">Sign in securely</button></form>
-      <p id="authMessage" class="status-message" role="alert" aria-live="polite"></p>
-      <p class="security-note"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i><span>Firebase verifies your session. Your files are never public.</span></p>
-    </section>
-  </div>
-
-  <div id="driveApp" class="app-shell" hidden>
-    <aside class="sidebar" aria-label="Drive navigation">
-      <a class="brand" href="index.html">
-        <img src="https://i.postimg.cc/VL9RBtWh/Elegant-AI-Agency-Logo-for-Zulora-20260208-153446-0000.png" alt="Zulora logo">
-        <span>Zulora Drive<small>PRIVATE CLOUD STORAGE</small></span>
-      </a>
-      <input id="fileInput" type="file" hidden multiple>
-      <button id="newUploadButton" class="button new-upload" type="button"><i class="fa-solid fa-plus"></i> New upload</button>
-      <nav>
-        <p class="nav-label">MY DRIVE</p>
-        <button class="nav-button active" data-filter="all" type="button"><i class="fa-solid fa-hard-drive"></i> All files</button>
-        <button class="nav-button" data-filter="recent" type="button"><i class="fa-regular fa-clock"></i> Recent</button>
-        <button class="nav-button" data-filter="starred" type="button"><i class="fa-regular fa-star"></i> Starred</button>
-        <p class="nav-label">FILE TYPES</p>
-        <button class="nav-button" data-filter="image" type="button"><i class="fa-regular fa-image"></i> Images</button>
-        <button class="nav-button" data-filter="video" type="button"><i class="fa-solid fa-film"></i> Video & audio</button>
-        <button class="nav-button" data-filter="document" type="button"><i class="fa-regular fa-file-lines"></i> Documents</button>
+      <nav class="nav-section">
+        <div class="nav-heading">Storage Views</div>
+        <button class="nav-item active" data-filter="all">
+          <span class="nav-item-left"><i class="fa-solid fa-folder-open"></i> All Files</span>
+          <span class="nav-count-badge" id="badgeCountAll">0</span>
+        </button>
+        <button class="nav-item" data-filter="image">
+          <span class="nav-item-left"><i class="fa-regular fa-image"></i> Photos &amp; Images</span>
+          <span class="nav-count-badge" id="badgeCountImages">0</span>
+        </button>
+        <button class="nav-item" data-filter="video">
+          <span class="nav-item-left"><i class="fa-solid fa-film"></i> Videos &amp; Audio</span>
+          <span class="nav-count-badge" id="badgeCountVideos">0</span>
+        </button>
+        <button class="nav-item" data-filter="document">
+          <span class="nav-item-left"><i class="fa-regular fa-file-lines"></i> Documents</span>
+          <span class="nav-count-badge" id="badgeCountDocs">0</span>
+        </button>
+        <button class="nav-item" data-filter="starred">
+          <span class="nav-item-left"><i class="fa-regular fa-star"></i> Starred</span>
+          <span class="nav-count-badge" id="badgeCountStarred">0</span>
+        </button>
       </nav>
-      <section class="storage-card glass" aria-label="Storage usage">
-        <strong id="tierLabel">Starter</strong>
-        <div class="meter"><span id="storageMeter"></span></div>
-        <span id="storageText" class="muted">Loading storage…</span>
-        <a class="button ghost small wide" href="pricing.html">Upgrade storage</a>
-      </section>
+
+      <div class="sidebar-footer">
+        <div class="sidebar-footer-title">
+          <i class="fa-solid fa-shield-halved"></i> 100% Encrypted
+        </div>
+        <p class="sidebar-footer-desc">
+          Your files are stored strictly inside your private directory. Only verified tokens can access your bytes.
+        </p>
+        <a href="pricing.html" class="btn btn-azure-subtle btn-sm" style="width:100%; justify-content:center;">
+          View Pricing Plans
+        </a>
+      </div>
     </aside>
 
-    <main class="main">
-      <header class="topbar">
-        <h1 id="viewTitle">My Drive</h1>
-        <div class="user-menu">
-          <div id="userAvatar" class="avatar" aria-hidden="true">ZD</div>
-          <span id="userName" class="user-name">Loading…</span>
-          <button id="signOutButton" class="button ghost small" type="button" title="Sign out"><i class="fa-solid fa-arrow-right-from-bracket"></i><span class="user-name">Sign out</span></button>
-        </div>
-      </header>
+    <!-- Main Canvas Area -->
+    <main class="main-content">
 
-      <section class="hero" aria-label="Account summary">
+      <!-- Dashboard Controls Toolbar -->
+      <section class="dashboard-toolbar">
+        <div class="toolbar-left">
+          <div class="search-box">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input type="text" id="fileSearchInput" class="search-input" placeholder="Search your files by name…">
+          </div>
+        </div>
+
+        <div class="toolbar-right">
+          <!-- Sort Dropdown -->
+          <select id="fileSortSelect" class="sort-select" aria-label="Sort Files">
+            <option value="recent">Recently Uploaded</option>
+            <option value="name">File Name (A–Z)</option>
+            <option value="size">Size (Largest first)</option>
+          </select>
+
+          <!-- Grid vs List View Mode Toggle -->
+          <div class="view-toggle-group">
+            <button class="view-toggle-btn active" id="viewModeGridBtn" title="Grid view">
+              <i class="fa-solid fa-grip"></i>
+            </button>
+            <button class="view-toggle-btn" id="viewModeListBtn" title="List view">
+              <i class="fa-solid fa-list-ul"></i>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Drag & Drop Zone -->
+      <section class="upload-dropzone" id="fileDropZone" role="button" tabindex="0">
+        <div class="dropzone-icon">
+          <i class="fa-solid fa-cloud-arrow-up"></i>
+        </div>
+        <div class="dropzone-text">
+          <strong>Drag and drop your photos, videos, and files here</strong>
+          <p>or click anywhere in this card to browse files from your device</p>
+        </div>
+      </section>
+
+      <!-- Realtime Upload Progress Bar -->
+      <section class="upload-progress-panel" id="uploadProgressPanel" hidden>
+        <div class="progress-info">
+          <span class="progress-file-name" id="uploadFileNameLabel">Uploading…</span>
+          <span class="progress-percentage" id="uploadPercentLabel">0%</span>
+        </div>
+        <div class="progress-bar-wrapper">
+          <div class="progress-bar-fill" id="uploadProgressFill"></div>
+        </div>
+      </section>
+
+      <!-- File Manager View: Grid View -->
+      <section class="file-grid" id="fileGridContainer" aria-label="Files Grid View"></section>
+
+      <!-- File Manager View: List View -->
+      <section class="file-list-container" id="fileListContainer" hidden aria-label="Files List View">
+        <table class="file-table">
+          <thead>
+            <tr>
+              <th style="width: 42px;"></th>
+              <th>Name</th>
+              <th>Size</th>
+              <th>Uploaded</th>
+              <th style="text-align: right; width: 140px;">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="fileListTableBody"></tbody>
+        </table>
+      </section>
+
+      <!-- Empty State -->
+      <div class="empty-state" id="emptyFilesState" hidden>
+        <div class="empty-icon"><i class="fa-regular fa-folder-open"></i></div>
+        <strong>No files found</strong>
+        <p>Drop photos, videos, or documents above to upload your first private file.</p>
+      </div>
+
+      <!-- ====================================================================
+           SUPER ADMIN PANEL (Visible ONLY if logged in as zulora.help@gmail.com)
+           ==================================================================== -->
+      <section class="admin-container" id="superAdminSection" hidden>
+        <div class="admin-header">
+          <div class="admin-header-title">
+            <i class="fa-solid fa-crown" style="color: var(--azure-primary); font-size: 1.3rem;"></i>
+            <h2>Super Admin Control Center</h2>
+          </div>
+          <span class="badge badge-admin">Master Root · zulora.help@gmail.com</span>
+        </div>
+
+        <!-- Metrics Overview -->
+        <div class="admin-metrics-grid">
+          <div class="metric-card">
+            <span class="metric-label">Total Users</span>
+            <span class="metric-value" id="adminMetricUsers">—</span>
+          </div>
+          <div class="metric-card">
+            <span class="metric-label">Global Files</span>
+            <span class="metric-value" id="adminMetricFiles">—</span>
+          </div>
+          <div class="metric-card">
+            <span class="metric-label">Total Storage Allocated</span>
+            <span class="metric-value" id="adminMetricStorage">—</span>
+          </div>
+          <div class="metric-card">
+            <span class="metric-label">Pending Upgrades</span>
+            <span class="metric-value" id="adminMetricUpgrades">—</span>
+          </div>
+        </div>
+
+        <!-- Registered Users & Quota Override Table -->
         <div>
-          <p class="eyebrow">Your private workspace</p>
-          <h2>Everything you upload stays yours.</h2>
-          <p>Account ID: <span id="accountId" class="account-id">—</span></p>
+          <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 0.85rem;">Registered Users &amp; Storage Quotas</h3>
+          <div class="admin-table-wrapper">
+            <table class="file-table">
+              <thead>
+                <tr>
+                  <th>User &amp; Email</th>
+                  <th>Account ID</th>
+                  <th>Storage Used</th>
+                  <th>Current Quota</th>
+                  <th>Tier</th>
+                  <th>Quota Override (GB)</th>
+                </tr>
+              </thead>
+              <tbody id="adminUsersTableBody">
+                <tr><td colspan="6" style="text-align:center; padding: 2rem;">Loading registered users…</td></tr>
+              </tbody>
+            </table>
+          </div>
         </div>
-        <a class="button" href="pricing.html"><i class="fa-solid fa-bolt"></i> Get more storage</a>
-      </section>
 
-      <section class="drive-toolbar" aria-label="File controls">
-        <label class="search" for="searchInput"><i class="fa-solid fa-magnifying-glass"></i><input id="searchInput" type="search" placeholder="Search your files" autocomplete="off"></label>
-        <select id="sortSelect" class="toolbar-select" aria-label="Sort files">
-          <option value="recent">Recently added</option>
-          <option value="name">Name</option>
-          <option value="size">File size</option>
-        </select>
-      </section>
-
-      <section id="dropZone" class="upload-drop" aria-label="Upload files">
+        <!-- Global System Files View & Deletion Table -->
         <div>
-          <strong>Drop files here to upload</strong>
-          <p>or choose files from your device. Each upload is checked against your quota.</p>
-          <button id="browseButton" class="button ghost small" type="button">Browse files</button>
+          <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 0.85rem;">System-Wide File Tree (All Users)</h3>
+          <div class="admin-table-wrapper">
+            <table class="file-table">
+              <thead>
+                <tr>
+                  <th>File Name</th>
+                  <th>Directory Path</th>
+                  <th>Owner UID</th>
+                  <th>Size</th>
+                  <th>Uploaded</th>
+                  <th style="text-align: right;">Global Actions</th>
+                </tr>
+              </thead>
+              <tbody id="adminFilesTableBody">
+                <tr><td colspan="6" style="text-align:center; padding: 2rem;">Loading all system files…</td></tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </section>
 
-      <section id="uploadProgress" class="progress-panel" hidden aria-live="polite">
-        <div class="progress-header"><span id="uploadFileName">Uploading…</span><strong id="uploadPercent">0%</strong></div>
-        <div class="progress-track"><span id="uploadProgressBar"></span></div>
-      </section>
-
-      <section id="fileGrid" class="file-grid" aria-live="polite"></section>
-      <section id="emptyState" class="empty" hidden><i class="fa-regular fa-folder-open"></i><strong>No files here yet</strong><p>Upload a document, image, audio file, or video to get started.</p></section>
-
-      <section id="adminPanel" class="admin-panel" hidden aria-labelledby="admin-title">
-        <p class="eyebrow">Super admin</p>
-        <h2 id="admin-title">Drive operations</h2>
-        <p class="muted">Server-wide data is available only to zulora.help@gmail.com.</p>
-        <div id="adminSummary" class="admin-summary"></div>
-        <h3>Users and storage quotas</h3>
-        <div class="admin-list"><table><thead><tr><th>User</th><th>Account</th><th>Used</th><th>Plan</th><th>Quota control</th></tr></thead><tbody id="adminUsers"></tbody></table></div>
-        <h3>Server file structure</h3>
-        <div class="admin-list"><table><thead><tr><th>Storage folder</th><th>File</th><th>Size</th><th>Uploaded</th></tr></thead><tbody id="adminFiles"></tbody></table></div>
-        <h3>Upgrade requests</h3>
-        <div class="admin-list"><table><thead><tr><th>User</th><th>Plan</th><th>Reference</th><th>Requested</th><th>Decision</th></tr></thead><tbody id="adminRequests"></tbody></table></div>
-      </section>
     </main>
   </div>
 
-  <div id="previewModal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="previewTitle">
-    <section class="modal-card">
-      <div class="modal-header"><div><p id="previewMeta" class="eyebrow">File preview</p><h2 id="previewTitle">Preview</h2></div><button class="icon-button" data-close-modal="previewModal" type="button" aria-label="Close preview"><i class="fa-solid fa-xmark"></i></button></div>
-      <div id="previewContent" class="preview-content"></div>
-      <div class="modal-actions">
-        <button id="downloadButton" class="button" type="button"><i class="fa-solid fa-download"></i> Download</button>
-        <button id="renameButton" class="button ghost" type="button"><i class="fa-solid fa-pen"></i> Rename</button>
-        <button id="deleteButton" class="button danger" type="button"><i class="fa-solid fa-trash"></i> Delete</button>
+  <!-- ========================================================================
+       MODAL: FILE PREVIEW (Instant media & image viewer)
+       ======================================================================== -->
+  <div class="modal-backdrop" id="filePreviewModal" hidden role="dialog" aria-modal="true">
+    <div class="modal-shell">
+      <div class="modal-header">
+        <div class="modal-title-box">
+          <h3 id="previewModalFileName">File Preview</h3>
+          <p id="previewModalFileMeta">Loading details…</p>
+        </div>
+        <button class="btn btn-icon" id="closePreviewBtn" title="Close Preview">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
       </div>
-    </section>
+
+      <div class="modal-body">
+        <div class="preview-viewport" id="previewMediaViewport">
+          <div class="preview-fallback">
+            <i class="fa-solid fa-spinner fa-spin"></i>
+            <p>Loading private media content…</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-azure" id="previewDownloadBtn">
+          <i class="fa-solid fa-download"></i> Download
+        </button>
+        <button class="btn btn-ghost" id="previewRenameBtn">
+          <i class="fa-solid fa-pen"></i> Rename
+        </button>
+        <button class="btn btn-danger-ghost" id="previewDeleteBtn">
+          <i class="fa-solid fa-trash"></i> Delete File
+        </button>
+      </div>
+    </div>
   </div>
-  <div id="toast" class="toast" hidden role="status" aria-live="polite"></div>
-  <script type="module" src="script.js"></script>
+
+  <!-- ========================================================================
+       MODAL: AUTH OVERLAY (When user is not signed in)
+       ======================================================================== -->
+  <div class="modal-backdrop" id="authPromptModal" hidden role="dialog" aria-modal="true">
+    <div class="auth-overlay-card">
+      <img src="https://i.postimg.cc/VL9RBtWh/Elegant-AI-Agency-Logo-for-Zulora-20260208-153446-0000.png"
+           alt="Zulora Logo" class="auth-brand-logo">
+      <div>
+        <h2 style="font-size: 1.45rem; font-weight: 800; letter-spacing: -0.03em;">Welcome to Zulora Drive</h2>
+        <p style="color: var(--text-muted); font-size: 0.88rem; margin-top: 0.3rem;">
+          Sign in with your Google account to unlock your 10 GB private storage vault.
+        </p>
+      </div>
+
+      <button class="google-btn" id="modalGoogleSignInBtn">
+        <i class="fa-brands fa-google"></i> Continue with Google
+      </button>
+
+      <div style="font-size: 0.76rem; color: var(--text-light); line-height: 1.4;">
+        Protected by Firebase Authentication &amp; Firestore Security Rules.
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Bar -->
+  <div class="toast-box" id="globalToast" hidden role="status" aria-live="polite">
+    <i class="fa-solid fa-circle-check" id="toastIcon"></i>
+    <span id="toastMessage">Notification</span>
+  </div>
+
+  <!-- ========================================================================
+       FIREBASE AUTHENTICATION & CORE CLIENT LOGIC
+       ======================================================================== -->
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js';
+    import {
+      GoogleAuthProvider,
+      getAuth,
+      onAuthStateChanged,
+      setPersistence,
+      browserLocalPersistence,
+      signInWithPopup,
+      signOut
+    } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js';
+
+    // ── 1. Configuration ──────────────────────────────────────────────────
+    const firebaseConfig = {
+      apiKey: "AIzaSyBGOtawcfRqXTm7jw5P3DB0qhJCUTmfyDc",
+      authDomain: "zulora-drive.firebaseapp.com",
+      projectId: "zulora-drive",
+      storageBucket: "zulora-drive.firebasestorage.app",
+      messagingSenderId: "715420173020",
+      appId: "1:715420173020:web:46245edda3eb0f31edaa19"
+    };
+
+    const ADMIN_EMAIL = 'zulora.help@gmail.com';
+    const GIB = 1024 ** 3;
+    const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+      ? (window.location.port === '5000' ? '' : 'http://localhost:5000')
+      : 'https://zulora-drive-backend.onrender.com';
+
+    // Initialize Firebase Client
+    const firebaseApp = initializeApp(firebaseConfig);
+    const auth = getAuth(firebaseApp);
+    const googleProvider = new GoogleAuthProvider();
+    googleProvider.setCustomParameters({ prompt: 'select_account' });
+    setPersistence(auth, browserLocalPersistence).catch(console.warn);
+
+    // ── 2. Reactive State ─────────────────────────────────────────────────
+    const state = {
+      user: null,
+      profile: null,
+      files: [],
+      filter: 'all',
+      sort: 'recent',
+      query: '',
+      viewMode: localStorage.getItem('zulora_view_mode') || 'grid', // 'grid' or 'list'
+      activePreviewFile: null,
+      previewBlobUrl: null
+    };
+
+    let toastTimer = null;
+
+    // ── 3. DOM Selectors ──────────────────────────────────────────────────
+    const $ = (selector) => document.querySelector(selector);
+    const $all = (selector) => [...document.querySelectorAll(selector)];
+
+    // ── 4. Utilities ──────────────────────────────────────────────────────
+    function escapeHtml(str) {
+      return String(str ?? '').replace(/[&<>'"]/g, (c) => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+      }[c]));
+    }
+
+    function formatBytes(bytes) {
+      const b = Number(bytes || 0);
+      if (!b) return '0 B';
+      const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+      const idx = Math.min(Math.floor(Math.log(b) / Math.log(1024)), units.length - 1);
+      return `${(b / (1024 ** idx)).toFixed(idx === 0 ? 0 : 1)} ${units[idx]}`;
+    }
+
+    function showToast(message, isError = false) {
+      const toast = $('#globalToast');
+      const toastMsg = $('#toastMessage');
+      const toastIcon = $('#toastIcon');
+      if (!toast) return;
+
+      toastMsg.textContent = message;
+      toast.classList.toggle('toast-error', isError);
+      toast.classList.toggle('toast-success', !isError);
+      toastIcon.className = isError ? 'fa-solid fa-circle-exclamation' : 'fa-solid fa-circle-check';
+      toast.hidden = false;
+
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => { toast.hidden = true; }, 4200);
+    }
+
+    function fileType(file) {
+      const mime = String(file.mimetype || '').toLowerCase();
+      if (mime.startsWith('image/')) return 'image';
+      if (mime.startsWith('video/') || mime.startsWith('audio/')) return 'video';
+      return 'document';
+    }
+
+    function fileIconClass(file) {
+      const type = fileType(file);
+      const mime = String(file.mimetype || '').toLowerCase();
+      if (type === 'image') return 'fa-regular fa-image';
+      if (mime.startsWith('video/')) return 'fa-solid fa-film';
+      if (mime.startsWith('audio/')) return 'fa-solid fa-headphones';
+      if (mime.includes('pdf')) return 'fa-regular fa-file-pdf';
+      if (String(file.originalName || '').match(/\.(zip|rar|7z|tar|gz)$/i)) return 'fa-solid fa-file-zipper';
+      return 'fa-regular fa-file-lines';
+    }
+
+    // ── 5. API Client With Firebase Bearer Token ──────────────────────────
+    async function getIdToken() {
+      const user = auth.currentUser || state.user;
+      if (!user) throw new Error('Please sign in to continue.');
+      return user.getIdToken();
+    }
+
+    async function api(endpoint, options = {}) {
+      const token = await getIdToken();
+      const headers = new Headers(options.headers || {});
+      headers.set('Authorization', `Bearer ${token}`);
+      headers.set('Bypass-Tunnel-Reminder', 'true');
+
+      if (options.body && !(options.body instanceof FormData) && !headers.has('Content-Type')) {
+        headers.set('Content-Type', 'application/json');
+      }
+
+      let response;
+      try {
+        response = await fetch(`${API_BASE_URL}${endpoint}`, { ...options, headers });
+      } catch (err) {
+        throw new Error(`Cannot reach Zulora Drive server at ${API_BASE_URL}. Ensure backend is running.`);
+      }
+
+      if (response.status === 204) return null;
+      const ct = response.headers.get('content-type') || '';
+      const payload = ct.includes('application/json') ? await response.json() : null;
+      if (!response.ok) {
+        throw new Error(payload?.error || `API request failed with code ${response.status}`);
+      }
+      return payload;
+    }
+
+    async function fetchFileBlob(file, isAdminOverride = false) {
+      const token = await getIdToken();
+      const url = isAdminOverride
+        ? `${API_BASE_URL}/api/admin/files/${encodeURIComponent(file.id)}/content`
+        : `${API_BASE_URL}/api/files/${encodeURIComponent(file.id)}/content`;
+
+      const response = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Bypass-Tunnel-Reminder': 'true'
+        }
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to download file stream.');
+      }
+      return response.blob();
+    }
+
+    // ── 6. Profile & Realtime Storage Display ─────────────────────────────
+    async function syncProfile() {
+      try {
+        const data = await api('/api/users/me/bootstrap', {
+          method: 'POST',
+          body: JSON.stringify({
+            displayName: state.user.displayName || '',
+            photoURL: state.user.photoURL || ''
+          })
+        });
+        state.profile = data.profile;
+        renderHeaderProfile();
+      } catch (err) {
+        console.warn('Profile sync fallback:', err);
+      }
+    }
+
+    function renderHeaderProfile() {
+      const p = state.profile;
+      if (!p) return;
+
+      // Header User Information
+      $('#headerUserName').textContent = p.displayName || p.email.split('@')[0];
+      $('#headerUserAccountId').textContent = p.accountId || p.uid.slice(0, 10);
+
+      // Avatar
+      const avatarEl = $('#headerUserAvatar');
+      if (p.photoURL) {
+        avatarEl.innerHTML = `<img src="${escapeHtml(p.photoURL)}" alt="Avatar" style="width:100%; height:100%; border-radius:50%; object-fit:cover;">`;
+      } else {
+        const initials = (p.displayName || p.email).split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+        avatarEl.textContent = initials || 'ZD';
+      }
+
+      // Storage Usage Bar (e.g. "1.2 GB / 10 GB Used")
+      const usedFormatted = formatBytes(p.storageUsed);
+      const limitFormatted = formatBytes(p.storageLimit);
+      $('#headerStorageText').textContent = `${usedFormatted} / ${limitFormatted}`;
+
+      const pct = Math.min(100, Math.round(((p.storageUsed || 0) / (p.storageLimit || 1)) * 100));
+      const bar = $('#headerStorageBar');
+      bar.style.width = `${pct}%`;
+      bar.style.backgroundColor = pct > 90 ? 'var(--danger)' : (pct > 75 ? 'var(--warning)' : 'var(--azure-primary)');
+
+      // Super Admin detection
+      if (p.isAdmin || (state.user?.email && state.user.email.toLowerCase() === ADMIN_EMAIL)) {
+        $('#superAdminSection').hidden = false;
+        loadAdminData();
+      } else {
+        $('#superAdminSection').hidden = true;
+      }
+    }
+
+    // ── 7. File Operations & Rendering (Grid & List) ───────────────────────
+    async function loadFiles() {
+      try {
+        const data = await api('/api/files');
+        state.files = data.files || [];
+        updateBadgeCounts();
+        renderFileManager();
+      } catch (err) {
+        showToast(err.message, true);
+      }
+    }
+
+    function updateBadgeCounts() {
+      const files = state.files;
+      $('#badgeCountAll').textContent = files.length;
+      $('#badgeCountImages').textContent = files.filter(f => fileType(f) === 'image').length;
+      $('#badgeCountVideos').textContent = files.filter(f => fileType(f) === 'video').length;
+      $('#badgeCountDocs').textContent = files.filter(f => fileType(f) === 'document').length;
+      $('#badgeCountStarred').textContent = files.filter(f => f.isStarred).length;
+    }
+
+    function filteredFiles() {
+      const q = state.query.toLowerCase();
+      let list = state.files.filter((file) => {
+        if (state.filter === 'starred' && !file.isStarred) return false;
+        if (state.filter !== 'all' && state.filter !== 'starred' && fileType(file) !== state.filter) return false;
+        if (q && !String(file.originalName).toLowerCase().includes(q)) return false;
+        return true;
+      });
+
+      // Sort
+      return list.sort((a, b) => {
+        if (state.sort === 'name') return String(a.originalName).localeCompare(String(b.originalName));
+        if (state.sort === 'size') return (b.size || 0) - (a.size || 0);
+        return new Date(b.uploadedAt || 0) - new Date(a.uploadedAt || 0);
+      });
+    }
+
+    function renderFileManager() {
+      const visible = filteredFiles();
+      const isEmpty = visible.length === 0;
+
+      $('#emptyFilesState').hidden = !isEmpty;
+
+      if (state.viewMode === 'grid') {
+        $('#fileGridContainer').hidden = isEmpty;
+        $('#fileListContainer').hidden = true;
+        renderGridView(visible);
+      } else {
+        $('#fileGridContainer').hidden = true;
+        $('#fileListContainer').hidden = isEmpty;
+        renderListView(visible);
+      }
+    }
+
+    function renderGridView(files) {
+      const grid = $('#fileGridContainer');
+      grid.innerHTML = files.map((file) => `
+        <article class="file-card" data-file-id="${escapeHtml(file.id)}">
+          <button class="star-toggle-btn ${file.isStarred ? 'is-starred' : ''}"
+                  data-action="star" data-file-id="${escapeHtml(file.id)}"
+                  title="${file.isStarred ? 'Remove from starred' : 'Add to starred'}">
+            <i class="${file.isStarred ? 'fa-solid' : 'fa-regular'} fa-star"></i>
+          </button>
+
+          <div class="file-card-preview-thumb" data-action="preview" data-file-id="${escapeHtml(file.id)}">
+            <i class="file-type-icon ${fileIconClass(file)}"></i>
+          </div>
+
+          <div class="file-card-info" data-action="preview" data-file-id="${escapeHtml(file.id)}">
+            <div class="file-card-name" title="${escapeHtml(file.originalName)}">${escapeHtml(file.originalName)}</div>
+            <div class="file-card-meta">
+              <span>${formatBytes(file.size)}</span>
+              <span>${file.uploadedAt ? new Date(file.uploadedAt).toLocaleDateString() : 'Just now'}</span>
+            </div>
+          </div>
+
+          <div class="file-card-actions">
+            <button class="btn btn-ghost btn-sm" data-action="preview" data-file-id="${escapeHtml(file.id)}" title="Preview">
+              <i class="fa-regular fa-eye"></i> View
+            </button>
+            <button class="btn btn-azure-subtle btn-sm" data-action="download" data-file-id="${escapeHtml(file.id)}" title="Download">
+              <i class="fa-solid fa-download"></i>
+            </button>
+            <button class="btn btn-ghost btn-sm" data-action="delete" data-file-id="${escapeHtml(file.id)}" title="Delete" style="color:var(--danger)">
+              <i class="fa-regular fa-trash-can"></i>
+            </button>
+          </div>
+        </article>
+      `).join('');
+    }
+
+    function renderListView(files) {
+      const tbody = $('#fileListTableBody');
+      tbody.innerHTML = files.map((file) => `
+        <tr data-file-id="${escapeHtml(file.id)}">
+          <td style="text-align: center;">
+            <button class="star-toggle-btn ${file.isStarred ? 'is-starred' : ''}"
+                    style="position:static; display:inline-grid;"
+                    data-action="star" data-file-id="${escapeHtml(file.id)}">
+              <i class="${file.isStarred ? 'fa-solid' : 'fa-regular'} fa-star"></i>
+            </button>
+          </td>
+          <td>
+            <div class="file-list-name-cell" data-action="preview" data-file-id="${escapeHtml(file.id)}">
+              <span class="file-list-icon"><i class="${fileIconClass(file)}"></i></span>
+              <span title="${escapeHtml(file.originalName)}">${escapeHtml(file.originalName)}</span>
+            </div>
+          </td>
+          <td>${formatBytes(file.size)}</td>
+          <td>${file.uploadedAt ? new Date(file.uploadedAt).toLocaleString() : '—'}</td>
+          <td style="text-align: right;">
+            <div class="file-list-actions" style="justify-content: flex-end;">
+              <button class="btn btn-icon btn-sm" data-action="preview" data-file-id="${escapeHtml(file.id)}" title="Instant Preview">
+                <i class="fa-regular fa-eye"></i>
+              </button>
+              <button class="btn btn-icon btn-sm" data-action="download" data-file-id="${escapeHtml(file.id)}" title="Download File">
+                <i class="fa-solid fa-download"></i>
+              </button>
+              <button class="btn btn-icon btn-sm" data-action="delete" data-file-id="${escapeHtml(file.id)}" title="Delete File" style="color:var(--danger);">
+                <i class="fa-regular fa-trash-can"></i>
+              </button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    // ── 8. Upload Handling with Realtime Progress ─────────────────────────
+    async function uploadSingleFile(file) {
+      const token = await getIdToken();
+      return new Promise((resolve, reject) => {
+        const formData = new FormData();
+        formData.append('file', file, file.name);
+
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', `${API_BASE_URL}/api/files`);
+        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+        xhr.setRequestHeader('Bypass-Tunnel-Reminder', 'true');
+
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable) {
+            const pct = Math.round((event.loaded / event.total) * 100);
+            $('#uploadPercentLabel').textContent = `${pct}%`;
+            $('#uploadProgressFill').style.width = `${pct}%`;
+          }
+        };
+
+        xhr.onload = () => {
+          let res = {};
+          try { res = JSON.parse(xhr.responseText || '{}'); } catch {}
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve(res.file);
+          } else {
+            reject(new Error(res.error || `Upload failed with HTTP ${xhr.status}`));
+          }
+        };
+
+        xhr.onerror = () => reject(new Error('Network error during file upload.'));
+        xhr.send(formData);
+      });
+    }
+
+    async function handleFileUploadQueue(fileList) {
+      const queue = [...fileList];
+      if (!queue.length) return;
+
+      const progressPanel = $('#uploadProgressPanel');
+      progressPanel.hidden = false;
+
+      let successCount = 0;
+      for (const file of queue) {
+        $('#uploadFileNameLabel').textContent = file.name;
+        $('#uploadPercentLabel').textContent = '0%';
+        $('#uploadProgressFill').style.width = '0%';
+
+        try {
+          const uploaded = await uploadSingleFile(file);
+          state.files.unshift(uploaded);
+          successCount++;
+        } catch (err) {
+          showToast(`"${file.name}": ${err.message}`, true);
+        }
+      }
+
+      progressPanel.hidden = true;
+      if (successCount > 0) {
+        showToast(`Successfully uploaded ${successCount} file${successCount > 1 ? 's' : ''}.`);
+        await syncProfile();
+        updateBadgeCounts();
+        renderFileManager();
+      }
+    }
+
+    // ── 9. Instant Preview Modal ──────────────────────────────────────────
+    async function openFilePreview(file, isAdminView = false) {
+      state.activePreviewFile = file;
+      $('#previewModalFileName').textContent = file.originalName;
+      $('#previewModalFileMeta').textContent = `${formatBytes(file.size)} · ${file.mimetype || 'Unknown Type'}`;
+
+      const viewport = $('#previewMediaViewport');
+      viewport.innerHTML = `
+        <div class="preview-fallback">
+          <i class="fa-solid fa-spinner fa-spin"></i>
+          <p>Decrypting and loading private file stream…</p>
+        </div>
+      `;
+
+      $('#filePreviewModal').hidden = false;
+
+      try {
+        const blob = await fetchFileBlob(file, isAdminView);
+        if (state.previewBlobUrl) {
+          URL.revokeObjectURL(state.previewBlobUrl);
+        }
+        state.previewBlobUrl = URL.createObjectURL(blob);
+
+        const mime = String(file.mimetype || '').toLowerCase();
+        viewport.innerHTML = '';
+
+        if (mime.startsWith('image/')) {
+          const img = document.createElement('img');
+          img.src = state.previewBlobUrl;
+          img.alt = file.originalName;
+          viewport.appendChild(img);
+        } else if (mime.startsWith('video/')) {
+          const vid = document.createElement('video');
+          vid.src = state.previewBlobUrl;
+          vid.controls = true;
+          vid.autoplay = true;
+          viewport.appendChild(vid);
+        } else if (mime.startsWith('audio/')) {
+          const aud = document.createElement('audio');
+          aud.src = state.previewBlobUrl;
+          aud.controls = true;
+          aud.autoplay = true;
+          viewport.appendChild(aud);
+        } else if (mime === 'application/pdf') {
+          const frame = document.createElement('iframe');
+          frame.src = state.previewBlobUrl;
+          viewport.appendChild(frame);
+        } else {
+          viewport.innerHTML = `
+            <div class="preview-fallback">
+              <i class="fa-regular fa-file-lines"></i>
+              <p>Direct browser preview is not supported for this format.</p>
+              <button class="btn btn-azure btn-sm" id="fallbackDownloadBtn">Download to Open Safely</button>
+            </div>
+          `;
+          $('#fallbackDownloadBtn')?.addEventListener('click', () => triggerDownload(file));
+        }
+      } catch (err) {
+        viewport.innerHTML = `
+          <div class="preview-fallback">
+            <i class="fa-solid fa-triangle-exclamation" style="color:var(--danger)"></i>
+            <p>${escapeHtml(err.message || 'Unable to open file preview.')}</p>
+          </div>
+        `;
+      }
+    }
+
+    function closePreviewModal() {
+      $('#filePreviewModal').hidden = true;
+      if (state.previewBlobUrl) {
+        URL.revokeObjectURL(state.previewBlobUrl);
+        state.previewBlobUrl = null;
+      }
+      state.activePreviewFile = null;
+    }
+
+    async function triggerDownload(file, isAdminDownload = false) {
+      try {
+        const blob = await fetchFileBlob(file, isAdminDownload);
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = file.originalName;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      } catch (err) {
+        showToast(err.message, true);
+      }
+    }
+
+    async function toggleFileStar(fileId) {
+      const file = state.files.find(f => f.id === fileId);
+      if (!file) return;
+
+      const nextStarred = !file.isStarred;
+      file.isStarred = nextStarred;
+      renderFileManager();
+
+      try {
+        await api(`/api/files/${encodeURIComponent(fileId)}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ isStarred: nextStarred })
+        });
+        updateBadgeCounts();
+      } catch (err) {
+        file.isStarred = !nextStarred;
+        renderFileManager();
+        showToast(err.message, true);
+      }
+    }
+
+    async function renameFilePrompt(file) {
+      const newName = window.prompt('Enter new name for file:', file.originalName);
+      if (!newName || newName.trim() === file.originalName) return;
+
+      try {
+        const updated = await api(`/api/files/${encodeURIComponent(file.id)}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ originalName: newName.trim() })
+        });
+        const idx = state.files.findIndex(f => f.id === file.id);
+        if (idx !== -1) state.files[idx] = updated.file;
+        renderFileManager();
+        if (state.activePreviewFile?.id === file.id) {
+          $('#previewModalFileName').textContent = updated.file.originalName;
+        }
+        showToast('File renamed successfully.');
+      } catch (err) {
+        showToast(err.message, true);
+      }
+    }
+
+    async function deleteFileConfirmed(fileId) {
+      if (!window.confirm('Permanently delete this file? This cannot be undone.')) return;
+
+      try {
+        await api(`/api/files/${encodeURIComponent(fileId)}`, { method: 'DELETE' });
+        state.files = state.files.filter(f => f.id !== fileId);
+        updateBadgeCounts();
+        renderFileManager();
+        await syncProfile();
+        closePreviewModal();
+        showToast('File deleted permanently.');
+      } catch (err) {
+        showToast(err.message, true);
+      }
+    }
+
+    // ── 10. Super Admin Control Panel ─────────────────────────────────────
+    async function loadAdminData() {
+      try {
+        const [overview, usersData, filesData] = await Promise.all([
+          api('/api/admin/overview'),
+          api('/api/admin/users'),
+          api('/api/admin/files')
+        ]);
+
+        // Overview metrics
+        $('#adminMetricUsers').textContent = overview.users ?? '0';
+        $('#adminMetricFiles').textContent = overview.files ?? '0';
+        $('#adminMetricStorage').textContent = formatBytes(overview.storageUsed);
+        $('#adminMetricUpgrades').textContent = overview.pendingUpgradeRequests ?? '0';
+
+        // Render Users Table with instant quota override
+        const usersTbody = $('#adminUsersTableBody');
+        usersTbody.innerHTML = (usersData.users || []).map((u) => {
+          const quotaGb = Math.round((u.storageLimit || 10 * GIB) / GIB);
+          return `
+            <tr>
+              <td>
+                <strong style="color:var(--text-main); display:block;">${escapeHtml(u.displayName || 'No Name')}</strong>
+                <span style="font-size:0.75rem; color:var(--text-muted);">${escapeHtml(u.email)}</span>
+              </td>
+              <td><code style="font-family:'JetBrains Mono'; font-size:0.78rem;">${escapeHtml(u.accountId || u.uid.slice(0, 8))}</code></td>
+              <td>${formatBytes(u.storageUsed)}</td>
+              <td>${formatBytes(u.storageLimit)}</td>
+              <td><span class="badge badge-azure">${escapeHtml(u.tier || 'Starter')}</span></td>
+              <td>
+                <div class="quota-input-group">
+                  <input type="number" class="quota-number-input" min="1" max="5000"
+                         value="${quotaGb}" data-quota-input="${escapeHtml(u.uid)}">
+                  <button class="btn btn-azure btn-sm" data-action="save-quota" data-user-uid="${escapeHtml(u.uid)}">
+                    Set Quota
+                  </button>
+                </div>
+              </td>
+            </tr>
+          `;
+        }).join('') || '<tr><td colspan="6" style="text-align:center; padding:1.5rem;">No registered users found.</td></tr>';
+
+        // Render System Files with global deletion & preview
+        const filesTbody = $('#adminFilesTableBody');
+        filesTbody.innerHTML = (filesData.files || []).map((f) => `
+          <tr>
+            <td>
+              <span style="font-weight:600; color:var(--text-main);">${escapeHtml(f.originalName)}</span>
+            </td>
+            <td><code style="font-size:0.75rem; color:var(--text-muted);">${escapeHtml(f.storageFolder || 'uploads/')}</code></td>
+            <td><code style="font-size:0.75rem;">${escapeHtml((f.ownerUid || '').slice(0, 10))}…</code></td>
+            <td>${formatBytes(f.size)}</td>
+            <td>${f.uploadedAt ? new Date(f.uploadedAt).toLocaleDateString() : '—'}</td>
+            <td style="text-align: right;">
+              <div class="file-list-actions" style="justify-content: flex-end;">
+                <button class="btn btn-icon btn-sm" data-action="admin-preview" data-file-id="${escapeHtml(f.id)}" title="Global View">
+                  <i class="fa-regular fa-eye"></i>
+                </button>
+                <button class="btn btn-icon btn-sm" data-action="admin-download" data-file-id="${escapeHtml(f.id)}" title="Download">
+                  <i class="fa-solid fa-download"></i>
+                </button>
+                <button class="btn btn-icon btn-sm" data-action="admin-delete" data-file-id="${escapeHtml(f.id)}" title="Global Delete" style="color:var(--danger)">
+                  <i class="fa-solid fa-trash"></i>
+                </button>
+              </div>
+            </td>
+          </tr>
+        `).join('') || '<tr><td colspan="6" style="text-align:center; padding:1.5rem;">No system files found.</td></tr>';
+
+      } catch (err) {
+        console.error('Admin loading failed:', err);
+      }
+    }
+
+    async function handleQuotaOverride(uid) {
+      const input = document.querySelector(`[data-quota-input="${CSS.escape(uid)}"]`);
+      if (!input) return;
+
+      const gb = Number(input.value);
+      if (!gb || gb < 1 || gb > 5000) {
+        showToast('Please enter a valid quota between 1 and 5,000 GB.', true);
+        return;
+      }
+
+      try {
+        await api('/api/admin/update-quota', {
+          method: 'POST',
+          body: JSON.stringify({ uid, storageLimitGb: gb })
+        });
+        showToast(`Quota updated to ${gb} GB successfully.`);
+        loadAdminData();
+      } catch (err) {
+        showToast(err.message, true);
+      }
+    }
+
+    async function handleGlobalAdminFileDelete(fileId) {
+      if (!window.confirm('Super Admin Action: Permanently delete this file from the server?')) return;
+      try {
+        await api(`/api/admin/files/${encodeURIComponent(fileId)}`, { method: 'DELETE' });
+        showToast('System file deleted successfully.');
+        loadAdminData();
+        loadFiles();
+      } catch (err) {
+        showToast(err.message, true);
+      }
+    }
+
+    // ── 11. Event Listeners & Interaction Dispatcher ──────────────────────
+    function attachEventListeners() {
+      // Sign-in overlay trigger
+      $('#modalGoogleSignInBtn')?.addEventListener('click', async () => {
+        try {
+          await signInWithPopup(auth, googleProvider);
+          $('#authPromptModal').hidden = true;
+        } catch (err) {
+          showToast(err.message, true);
+        }
+      });
+
+      // Sign out
+      $('#headerSignOutBtn')?.addEventListener('click', async () => {
+        await signOut(auth);
+        window.location.reload();
+      });
+
+      // Upload triggers
+      const picker = $('#filePickerInput');
+      $('#sidebarUploadBtn')?.addEventListener('click', () => picker?.click());
+      $('#fileDropZone')?.addEventListener('click', () => picker?.click());
+      picker?.addEventListener('change', (e) => handleFileUploadQueue(e.target.files));
+
+      // Drag and drop
+      const dropzone = $('#fileDropZone');
+      ['dragenter', 'dragover'].forEach(name => {
+        dropzone?.addEventListener(name, (e) => {
+          e.preventDefault();
+          dropzone.classList.add('dragging');
+        });
+      });
+      ['dragleave', 'drop'].forEach(name => {
+        dropzone?.addEventListener(name, (e) => {
+          e.preventDefault();
+          dropzone.classList.remove('dragging');
+        });
+      });
+      dropzone?.addEventListener('drop', (e) => {
+        if (e.dataTransfer?.files?.length) {
+          handleFileUploadQueue(e.dataTransfer.files);
+        }
+      });
+
+      // View mode switcher (Grid vs List)
+      $('#viewModeGridBtn')?.addEventListener('click', () => {
+        state.viewMode = 'grid';
+        localStorage.setItem('zulora_view_mode', 'grid');
+        $('#viewModeGridBtn').classList.add('active');
+        $('#viewModeListBtn').classList.remove('active');
+        renderFileManager();
+      });
+      $('#viewModeListBtn')?.addEventListener('click', () => {
+        state.viewMode = 'list';
+        localStorage.setItem('zulora_view_mode', 'list');
+        $('#viewModeListBtn').classList.add('active');
+        $('#viewModeGridBtn').classList.remove('active');
+        renderFileManager();
+      });
+
+      // Search & Sort
+      $('#fileSearchInput')?.addEventListener('input', (e) => {
+        state.query = e.target.value.trim();
+        renderFileManager();
+      });
+      $('#fileSortSelect')?.addEventListener('change', (e) => {
+        state.sort = e.target.value;
+        renderFileManager();
+      });
+
+      // Navigation filter pills
+      $all('.nav-item').forEach((item) => {
+        item.addEventListener('click', () => {
+          $all('.nav-item').forEach(i => i.classList.remove('active'));
+          item.classList.add('active');
+          state.filter = item.dataset.filter || 'all';
+          renderFileManager();
+        });
+      });
+
+      // File Manager event delegation (Grid and List)
+      const handleFileAction = (e) => {
+        const target = e.target.closest('[data-action]');
+        if (!target) return;
+
+        const action = target.dataset.action;
+        const fileId = target.dataset.fileId;
+        const file = state.files.find(f => f.id === fileId);
+
+        if (action === 'star') {
+          e.stopPropagation();
+          toggleFileStar(fileId);
+        } else if (action === 'preview' && file) {
+          e.stopPropagation();
+          openFilePreview(file);
+        } else if (action === 'download' && file) {
+          e.stopPropagation();
+          triggerDownload(file);
+        } else if (action === 'delete' && file) {
+          e.stopPropagation();
+          deleteFileConfirmed(fileId);
+        }
+      };
+
+      $('#fileGridContainer')?.addEventListener('click', handleFileAction);
+      $('#fileListContainer')?.addEventListener('click', handleFileAction);
+
+      // Preview modal actions
+      $('#closePreviewBtn')?.addEventListener('click', closePreviewModal);
+      $('#previewDownloadBtn')?.addEventListener('click', () => {
+        if (state.activePreviewFile) triggerDownload(state.activePreviewFile);
+      });
+      $('#previewRenameBtn')?.addEventListener('click', () => {
+        if (state.activePreviewFile) renameFilePrompt(state.activePreviewFile);
+      });
+      $('#previewDeleteBtn')?.addEventListener('click', () => {
+        if (state.activePreviewFile) deleteFileConfirmed(state.activePreviewFile.id);
+      });
+
+      // Super Admin event delegation
+      $('#superAdminSection')?.addEventListener('click', (e) => {
+        const saveQuotaBtn = e.target.closest('[data-action="save-quota"]');
+        if (saveQuotaBtn) {
+          handleQuotaOverride(saveQuotaBtn.dataset.userUid);
+          return;
+        }
+
+        const adminDeleteBtn = e.target.closest('[data-action="admin-delete"]');
+        if (adminDeleteBtn) {
+          handleGlobalAdminFileDelete(adminDeleteBtn.dataset.fileId);
+          return;
+        }
+
+        const adminPreviewBtn = e.target.closest('[data-action="admin-preview"]');
+        if (adminPreviewBtn) {
+          const fileId = adminPreviewBtn.dataset.fileId;
+          const fakeFile = { id: fileId, originalName: 'System File' };
+          openFilePreview(fakeFile, true);
+          return;
+        }
+
+        const adminDownloadBtn = e.target.closest('[data-action="admin-download"]');
+        if (adminDownloadBtn) {
+          const fileId = adminDownloadBtn.dataset.fileId;
+          triggerDownload({ id: fileId, originalName: 'system-file' }, true);
+          return;
+        }
+      });
+    }
+
+    // ── 12. Main Initialization Lifecycle ─────────────────────────────────
+    onAuthStateChanged(auth, async (firebaseUser) => {
+      state.user = firebaseUser;
+      if (!firebaseUser) {
+        $('#authPromptModal').hidden = false;
+        $('#headerStorageContainer').style.display = 'none';
+        $('#headerUserName').textContent = 'Guest';
+        $('#headerUserAccountId').textContent = 'Please sign in';
+        return;
+      }
+
+      $('#authPromptModal').hidden = true;
+      $('#headerStorageContainer').style.display = 'flex';
+
+      try {
+        await syncProfile();
+        await loadFiles();
+      } catch (err) {
+        showToast(err.message, true);
+      }
+    });
+
+    // Boot UI
+    attachEventListeners();
+    if (state.viewMode === 'list') {
+      $('#viewModeListBtn')?.classList.add('active');
+      $('#viewModeGridBtn')?.classList.remove('active');
+    }
+  </script>
 </body>
 </html>

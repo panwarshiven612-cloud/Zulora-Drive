@@ -119,10 +119,33 @@ function planFromKey(key) {
 // Firebase Admin is deliberately required for authenticated API endpoints.
 let db;
 let firebaseReady = false;
+
+function parseServiceAccount() {
+  const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
+  if (raw) {
+    // Attempt 1: direct JSON parse (env var is a JSON string).
+    try { return JSON.parse(raw); } catch { /* fall through */ }
+    // Attempt 2: base64-encoded JSON (common in CI/CD platforms like Render, Railway).
+    try { return JSON.parse(Buffer.from(raw, 'base64').toString('utf8')); } catch { /* fall through */ }
+    throw new Error(
+      'FIREBASE_SERVICE_ACCOUNT env var is set but could not be parsed as JSON or base64-encoded JSON. ' +
+      'Ensure it contains the full service-account JSON object or its base64 representation.'
+    );
+  }
+  // Attempt 3: local file fallback.
+  const filePath = path.resolve(__dirname, 'serviceAccountKey.json');
+  if (fs.existsSync(filePath)) {
+    console.info(`Loading Firebase credentials from ${filePath}`);
+    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  }
+  throw new Error(
+    'No Firebase credentials found. Set FIREBASE_SERVICE_ACCOUNT env var (JSON or base64) ' +
+    'or place a serviceAccountKey.json file in the backend/ directory.'
+  );
+}
+
 try {
-  const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT
-    ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
-    : require('./serviceaccountkey.json');
+  const serviceAccount = parseServiceAccount();
   const credential = cert(serviceAccount);
   if (!getApps().length) initializeApp({ credential, storageBucket: 'zulora-drive.firebasestorage.app' });
   db = getFirestore();
@@ -148,8 +171,18 @@ app.use(helmet({
     }
   }
 }));
+const CORS_ALLOWED_ORIGINS = [
+  'https://zulora-drive.vercel.app',
+  'http://localhost:3000',
+  'http://localhost:5000'
+];
 app.use(cors({
-  origin: '*',
+  origin(origin, callback) {
+    // Allow requests with no origin (server-to-server, curl, mobile apps).
+    if (!origin || CORS_ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
+    return callback(new ApiError(403, `Origin ${origin} is not allowed by CORS policy.`, 'CORS_BLOCKED'));
+  },
+  credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Authorization', 'Content-Type', 'Bypass-Tunnel-Reminder'],
   maxAge: 86400
@@ -409,6 +442,50 @@ app.get('/api/admin/files', requireFirebase, authenticate, requireAdmin, async (
   } catch (error) { next(error); }
 });
 
+app.get('/api/admin/files/:fileId/content', requireFirebase, authenticate, requireAdmin, async (req, res, next) => {
+  try {
+    const fileRef = db.collection('files').doc(String(req.params.fileId || ''));
+    const fileSnap = await fileRef.get();
+    if (!fileSnap.exists) throw new ApiError(404, 'File not found.', 'FILE_NOT_FOUND');
+    const data = fileSnap.data();
+    const directory = userDirectory(data.ownerUid);
+    const filePath = path.resolve(directory, path.basename(String(data.storedName || '')));
+    if (!filePath.startsWith(`${directory}${path.sep}`) || !fs.existsSync(filePath)) {
+      throw new ApiError(404, 'The stored file is unavailable.', 'STORAGE_FILE_NOT_FOUND');
+    }
+    const download = String(req.query.download || '') === '1';
+    res.setHeader('Content-Type', data.mimetype || 'application/octet-stream');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Content-Disposition', `${download ? 'attachment' : 'inline'}; filename="${contentDispositionName(data.originalName)}"`);
+    res.sendFile(filePath, { acceptRanges: true }, (error) => { if (error && !res.headersSent) next(error); });
+  } catch (error) { next(error); }
+});
+
+app.delete('/api/admin/files/:fileId', requireFirebase, authenticate, requireAdmin, async (req, res, next) => {
+  try {
+    const fileRef = db.collection('files').doc(String(req.params.fileId || ''));
+    let deletedFile;
+    await db.runTransaction(async (transaction) => {
+      const fileSnap = await transaction.get(fileRef);
+      if (!fileSnap.exists) throw new ApiError(404, 'File not found.', 'FILE_NOT_FOUND');
+      deletedFile = fileSnap.data();
+      const profileRef = db.collection('users').doc(deletedFile.ownerUid);
+      const profileSnap = await transaction.get(profileRef);
+      transaction.delete(fileRef);
+      if (profileSnap.exists) {
+        transaction.update(profileRef, {
+          storageUsed: Math.max(0, Number(profileSnap.data().storageUsed || 0) - Number(deletedFile.size || 0)),
+          updatedAt: FieldValue.serverTimestamp()
+        });
+      }
+    });
+    const directory = userDirectory(deletedFile.ownerUid);
+    const diskPath = path.resolve(directory, path.basename(String(deletedFile.storedName || '')));
+    if (diskPath.startsWith(`${directory}${path.sep}`)) await fsp.unlink(diskPath).catch(() => undefined);
+    res.status(204).end();
+  } catch (error) { next(error); }
+});
+
 app.patch('/api/admin/users/:uid', requireFirebase, authenticate, requireAdmin, async (req, res, next) => {
   try {
     const targetUid = String(req.params.uid || '').trim();
@@ -430,6 +507,33 @@ app.patch('/api/admin/users/:uid', requireFirebase, authenticate, requireAdmin, 
     if (Object.keys(updates).length === 1) throw new ApiError(400, 'Provide a plan or storage quota.', 'EMPTY_UPDATE');
     await targetRef.update(updates);
     res.json({ profile: profileForClient((await targetRef.get()).data()) });
+  } catch (error) { next(error); }
+});
+
+// Dedicated quota-update endpoint per spec: POST /api/admin/update-quota
+// Accepts { uid, storageLimitGb } — allows admin to set any user's quota directly.
+app.post('/api/admin/update-quota', requireFirebase, authenticate, requireAdmin, async (req, res, next) => {
+  try {
+    const targetUid = String(req.body?.uid || '').trim();
+    if (!targetUid || targetUid.length > 256) throw new ApiError(400, 'Provide a valid user uid.', 'INVALID_USER');
+    const gigabytes = Number(req.body?.storageLimitGb);
+    if (!Number.isFinite(gigabytes) || gigabytes < 1 || gigabytes > 5000) {
+      throw new ApiError(400, 'storageLimitGb must be a number between 1 and 5,000.', 'INVALID_QUOTA');
+    }
+    const targetRef = db.collection('users').doc(targetUid);
+    const targetSnap = await targetRef.get();
+    if (!targetSnap.exists) throw new ApiError(404, 'User not found.', 'USER_NOT_FOUND');
+    const newLimit = Math.floor(gigabytes * GIB);
+    await targetRef.update({
+      storageLimit: newLimit,
+      tier: 'custom',
+      updatedAt: FieldValue.serverTimestamp()
+    });
+    const updated = (await targetRef.get()).data();
+    res.json({
+      success: true,
+      profile: profileForClient({ ...updated, uid: targetUid })
+    });
   } catch (error) { next(error); }
 });
 
