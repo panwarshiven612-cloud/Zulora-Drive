@@ -1155,6 +1155,33 @@
       background: #047857;
     }
 
+    /* Backend Connection Status Banner */
+    .connection-error-banner {
+      background: #FEF2F2;
+      border-bottom: 1px solid #FCA5A5;
+      color: #991B1B;
+      padding: 0.65rem 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      font-size: 0.85rem;
+      font-weight: 600;
+      z-index: 100;
+      position: sticky;
+      top: 0;
+      box-shadow: 0 2px 8px rgba(239, 68, 68, 0.08);
+    }
+    .connection-error-content {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+    .connection-error-content i {
+      color: #DC2626;
+      font-size: 1rem;
+    }
+
     /* Responsive Queries */
     @media (max-width: 900px) {
       .app-layout {
@@ -1173,6 +1200,17 @@
   </style>
 </head>
 <body data-page="dashboard">
+
+  <!-- Backend Connection Status Banner (Auto-clears on successful server response) -->
+  <div class="connection-error-banner" id="connectionErrorBanner" hidden role="alert">
+    <div class="connection-error-content">
+      <i class="fa-solid fa-triangle-exclamation"></i>
+      <span id="connectionErrorMessage">Cannot reach Zulora Drive server at https://zulora-drive-backend.onrender.com. Ensure backend is running.</span>
+    </div>
+    <button class="btn btn-sm btn-ghost" id="retryConnectionBtn" type="button">
+      <i class="fa-solid fa-rotate-right"></i> Retry Connection
+    </button>
+  </div>
 
   <!-- ========================================================================
        TOP HEADER COMPONENT
@@ -1531,9 +1569,7 @@
 
     const ADMIN_EMAIL = 'zulora.help@gmail.com';
     const GIB = 1024 ** 3;
-    const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-      ? (window.location.port === '5000' ? '' : 'http://localhost:5000')
-      : 'https://zulora-drive-backend.onrender.com';
+    const API_BASE_URL = 'https://zulora-drive-backend.onrender.com';
 
     // Initialize Firebase Client
     const firebaseApp = initializeApp(firebaseConfig);
@@ -1610,6 +1646,24 @@
       return 'fa-regular fa-file-lines';
     }
 
+    // Backend health check ping
+    async function checkBackendHealth() {
+      const banner = $('#connectionErrorBanner');
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/health`, {
+          headers: { 'Bypass-Tunnel-Reminder': 'true' }
+        });
+        if (response.ok) {
+          if (banner) banner.hidden = true;
+          return true;
+        }
+      } catch (err) {
+        console.warn('Backend ping failed:', err);
+      }
+      if (banner) banner.hidden = false;
+      return false;
+    }
+
     // ── 5. API Client With Firebase Bearer Token ──────────────────────────
     async function getIdToken() {
       const user = auth.currentUser || state.user;
@@ -1630,7 +1684,12 @@
       let response;
       try {
         response = await fetch(`${API_BASE_URL}${endpoint}`, { ...options, headers });
+        // Automatically dismiss connection error banner on successful server contact
+        const banner = $('#connectionErrorBanner');
+        if (banner && !banner.hidden) banner.hidden = true;
       } catch (err) {
+        const banner = $('#connectionErrorBanner');
+        if (banner) banner.hidden = false;
         throw new Error(`Cannot reach Zulora Drive server at ${API_BASE_URL}. Ensure backend is running.`);
       }
 
@@ -2315,6 +2374,25 @@
           return;
         }
       });
+
+      // Retry connection button
+      $('#retryConnectionBtn')?.addEventListener('click', async () => {
+        const btn = $('#retryConnectionBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Checking server…';
+        const ok = await checkBackendHealth();
+        if (ok) {
+          showToast('Connected to Zulora Drive server!');
+          if (state.user) {
+            await syncProfile();
+            await loadFiles();
+          }
+        } else {
+          showToast('Backend is still waking up on Render. Please wait ~15s and retry.', true);
+        }
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-rotate-right"></i> Retry Connection';
+      });
     }
 
     // ── 12. Main Initialization Lifecycle ─────────────────────────────────
@@ -2341,6 +2419,7 @@
 
     // Boot UI
     attachEventListeners();
+    checkBackendHealth();
     if (state.viewMode === 'list') {
       $('#viewModeListBtn')?.classList.add('active');
       $('#viewModeGridBtn')?.classList.remove('active');

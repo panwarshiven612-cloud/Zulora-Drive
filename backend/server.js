@@ -228,6 +228,8 @@ app.use(helmet({
   }
 }));
 const CORS_ALLOWED_ORIGINS = [
+  'https://drive.zulora.in',
+  'https://zulora.in',
   'https://zulora-drive.vercel.app',
   'http://localhost:3000',
   'http://localhost:5000',
@@ -237,9 +239,10 @@ app.use(cors({
   origin(origin, callback) {
     // Allow requests with no origin (server-to-server, curl, mobile apps).
     if (!origin) return callback(null, true);
-    const normalized = origin.replace(/\/$/, '');
+    const normalized = origin.replace(/\/$/, '').toLowerCase();
     if (
       CORS_ALLOWED_ORIGINS.includes(normalized) ||
+      normalized.endsWith('.zulora.in') ||
       normalized.endsWith('.vercel.app')
     ) {
       return callback(null, true);

@@ -91,6 +91,18 @@ async function getToken() {
   return user.getIdToken();
 }
 
+async function checkBackendHealth() {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/health`, {
+      headers: { 'Bypass-Tunnel-Reminder': 'true' }
+    });
+    return response.ok;
+  } catch (error) {
+    console.warn('Backend ping failed:', error);
+    return false;
+  }
+}
+
 async function api(path, options = {}) {
   const headers = new Headers(options.headers || {});
   headers.set('Authorization', `Bearer ${await getToken()}`);
@@ -100,7 +112,7 @@ async function api(path, options = {}) {
   try {
     response = await fetch(`${API_BASE_URL}${path}`, { ...options, headers });
   } catch (error) {
-    throw new Error(`Cannot reach the Zulora Drive server at ${API_BASE_URL}. Confirm that the localtunnel process and backend are running.`);
+    throw new Error(`Cannot reach the Zulora Drive server at ${API_BASE_URL}. Ensure the backend is running.`);
   }
   if (response.status === 204) return null;
   const contentType = response.headers.get('content-type') || '';
