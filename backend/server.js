@@ -14,9 +14,17 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const multer = require('multer');
+const admin = require('firebase-admin');
 const { cert, getApps, initializeApp } = require('firebase-admin/app');
 const { getAuth } = require('firebase-admin/auth');
 const { FieldValue, getFirestore } = require('firebase-admin/firestore');
+
+// Ensure admin.apps getter is defined across all firebase-admin SDK versions
+if (!admin.apps) {
+  Object.defineProperty(admin, 'apps', {
+    get: () => (typeof getApps === 'function' ? getApps() : (admin.getApps ? admin.getApps() : []))
+  });
+}
 const fs = require('fs');
 const fsp = require('fs/promises');
 const path = require('path');
@@ -120,37 +128,74 @@ function planFromKey(key) {
 let db;
 let firebaseReady = false;
 
-function parseServiceAccount() {
-  const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
-  if (raw) {
-    // Attempt 1: direct JSON parse (env var is a JSON string).
-    try { return JSON.parse(raw); } catch { /* fall through */ }
-    // Attempt 2: base64-encoded JSON (common in CI/CD platforms like Render, Railway).
-    try { return JSON.parse(Buffer.from(raw, 'base64').toString('utf8')); } catch { /* fall through */ }
-    throw new Error(
-      'FIREBASE_SERVICE_ACCOUNT env var is set but could not be parsed as JSON or base64-encoded JSON. ' +
-      'Ensure it contains the full service-account JSON object or its base64 representation.'
-    );
+function getServiceAccountCredentials() {
+  let serviceAccount = null;
+
+  // 1. Check for process.env.FIREBASE_SERVICE_ACCOUNT
+  if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+    const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
+    // 2. Parse it cleanly using JSON.parse() if it's a string
+    if (typeof raw === 'string') {
+      try {
+        serviceAccount = JSON.parse(raw);
+      } catch (parseError) {
+        // Fallback: try base64 decode if env var is base64-encoded
+        try {
+          serviceAccount = JSON.parse(Buffer.from(raw, 'base64').toString('utf8'));
+        } catch {
+          console.warn('Failed to parse FIREBASE_SERVICE_ACCOUNT as JSON:', parseError.message);
+        }
+      }
+    } else if (typeof raw === 'object' && raw !== null) {
+      serviceAccount = raw;
+    }
   }
-  // Attempt 3: local file fallback.
-  const filePath = path.resolve(__dirname, 'serviceAccountKey.json');
-  if (fs.existsSync(filePath)) {
-    console.info(`Loading Firebase credentials from ${filePath}`);
-    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+
+  // 3. If environment variable is missing, fallback safely to ./serviceAccountKey.json
+  if (!serviceAccount) {
+    const candidatePaths = [
+      path.resolve(__dirname, 'serviceAccountKey.json'),
+      path.resolve(__dirname, 'serviceaccountkey.json'),
+      path.resolve(process.cwd(), 'serviceAccountKey.json')
+    ];
+
+    for (const filePath of candidatePaths) {
+      if (fs.existsSync(filePath)) {
+        try {
+          serviceAccount = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+          console.info(`Loaded Firebase credentials from ${filePath}`);
+          break;
+        } catch (fileErr) {
+          console.warn(`Could not read ${filePath}:`, fileErr.message);
+        }
+      }
+    }
   }
-  throw new Error(
-    'No Firebase credentials found. Set FIREBASE_SERVICE_ACCOUNT env var (JSON or base64) ' +
-    'or place a serviceAccountKey.json file in the backend/ directory.'
-  );
+
+  // Sanitize private key escaped newlines if present (\n -> actual newline)
+  if (serviceAccount && typeof serviceAccount.private_key === 'string') {
+    serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+  }
+
+  return serviceAccount;
 }
 
 try {
-  const serviceAccount = parseServiceAccount();
-  const credential = cert(serviceAccount);
-  if (!getApps().length) initializeApp({ credential, storageBucket: 'zulora-drive.firebasestorage.app' });
-  db = getFirestore();
-  firebaseReady = true;
-  console.info('Firebase Admin Initialized Successfully!');
+  const serviceAccount = getServiceAccountCredentials();
+  if (serviceAccount) {
+    const credential = cert(serviceAccount);
+    if (!admin.apps.length) {
+      initializeApp({
+        credential,
+        storageBucket: process.env.FIREBASE_STORAGE_BUCKET || 'zulora-drive.firebasestorage.app'
+      });
+    }
+    db = getFirestore();
+    firebaseReady = true;
+    console.info('Firebase Admin Initialized Successfully!');
+  } else {
+    console.warn('Firebase Admin credentials not found. Set FIREBASE_SERVICE_ACCOUNT or provide serviceAccountKey.json.');
+  }
 } catch (error) {
   console.warn(`Firebase Admin unavailable: ${error.message}`);
 }
@@ -191,7 +236,10 @@ app.use(express.json({ limit: '100kb' }));
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
 function requireFirebase(req, res, next) {
-  if (!firebaseReady) return next(new ApiError(503, 'Server authentication is not configured. Add Firebase Admin credentials before using the API.', 'FIREBASE_NOT_CONFIGURED'));
+  const isConfigured = Boolean((admin.apps && admin.apps.length > 0) || firebaseReady);
+  if (!isConfigured) {
+    return next(new ApiError(503, 'Server authentication is not configured. Add Firebase Admin credentials before using the API.', 'FIREBASE_NOT_CONFIGURED'));
+  }
   return next();
 }
 
@@ -285,7 +333,14 @@ const upload = multer({
   }
 });
 
-app.get('/api/health', (req, res) => res.json({ status: 'ok', firebaseConfigured: firebaseReady, timestamp: new Date().toISOString() }));
+app.get('/api/health', (req, res) => {
+  const isConfigured = Boolean(admin.apps && admin.apps.length > 0);
+  res.json({
+    status: 'ok',
+    firebaseConfigured: isConfigured,
+    timestamp: new Date().toISOString()
+  });
+});
 app.get('/api/plans', (req, res) => res.json({
   plans: Object.values(PLANS).map((plan) => ({ ...plan, storageLimitGb: plan.storageLimit / GIB })), paymentUpiId: PAYMENT_UPI_ID
 }));
