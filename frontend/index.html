@@ -1554,6 +1554,7 @@
       setPersistence,
       browserLocalPersistence,
       signInWithPopup,
+      signInWithRedirect,
       signOut
     } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js';
 
@@ -1570,6 +1571,8 @@
     const ADMIN_EMAIL = 'zulora.help@gmail.com';
     const GIB = 1024 ** 3;
     const API_BASE_URL = 'https://zulora-drive-backend.onrender.com';
+    const HEALTH_CHECK_WINDOW_MS = 25000;
+    const HEALTH_CHECK_REQUEST_TIMEOUT_MS = 8000;
 
     // Initialize Firebase Client
     const firebaseApp = initializeApp(firebaseConfig);
@@ -1649,16 +1652,26 @@
     // Backend health check ping
     async function checkBackendHealth() {
       const banner = $('#connectionErrorBanner');
-      try {
-        const response = await fetch(`${API_BASE_URL}/api/health`, {
-          headers: { 'Bypass-Tunnel-Reminder': 'true' }
-        });
-        if (response.ok) {
-          if (banner) banner.hidden = true;
-          return true;
+      const deadline = Date.now() + HEALTH_CHECK_WINDOW_MS;
+      while (Date.now() < deadline) {
+        const controller = new AbortController();
+        const timeout = window.setTimeout(() => controller.abort(), HEALTH_CHECK_REQUEST_TIMEOUT_MS);
+        try {
+          const response = await fetch(`${API_BASE_URL}/api/health`, {
+            headers: { 'Bypass-Tunnel-Reminder': 'true' },
+            signal: controller.signal
+          });
+          if (response.ok) {
+            if (banner) banner.hidden = true;
+            return true;
+          }
+        } catch (err) {
+          console.warn('Backend ping failed; retrying while Render wakes up.', err);
+        } finally {
+          window.clearTimeout(timeout);
         }
-      } catch (err) {
-        console.warn('Backend ping failed:', err);
+        const remaining = deadline - Date.now();
+        if (remaining > 0) await new Promise((resolve) => window.setTimeout(resolve, Math.min(1000, remaining)));
       }
       if (banner) banner.hidden = false;
       return false;
@@ -2231,7 +2244,15 @@
       // Sign-in overlay trigger
       $('#modalGoogleSignInBtn')?.addEventListener('click', async () => {
         try {
-          await signInWithPopup(auth, googleProvider);
+          try {
+            await signInWithPopup(auth, googleProvider);
+          } catch (error) {
+            if (['auth/popup-blocked', 'auth/operation-not-supported-in-this-environment'].includes(error.code)) {
+              await signInWithRedirect(auth, googleProvider);
+              return;
+            }
+            throw error;
+          }
           $('#authPromptModal').hidden = true;
         } catch (err) {
           showToast(err.message, true);

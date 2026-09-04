@@ -22,6 +22,7 @@ import {
   setPersistence,
   browserLocalPersistence,
   signInWithPopup,
+  signInWithRedirect,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut
@@ -139,7 +140,14 @@ async function refreshProfile() {
 
 /** Google Sign-In via popup. Returns the Firebase UserCredential. */
 async function signInWithGoogle() {
-  return signInWithPopup(auth, googleProvider);
+  try {
+    return await signInWithPopup(auth, googleProvider);
+  } catch (error) {
+    if (['auth/popup-blocked', 'auth/operation-not-supported-in-this-environment'].includes(error.code)) {
+      return signInWithRedirect(auth, googleProvider);
+    }
+    throw error;
+  }
 }
 
 /** Email + password sign-in. */

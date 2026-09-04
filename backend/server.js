@@ -215,6 +215,7 @@ fs.mkdirSync(UPLOAD_ROOT, { recursive: true });
 
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
+  crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' },
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"], baseUri: ["'self'"], objectSrc: ["'none'"],

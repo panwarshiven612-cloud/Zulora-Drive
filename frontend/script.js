@@ -6,12 +6,15 @@ import {
   setPersistence,
   browserLocalPersistence,
   signInWithPopup,
+  signInWithRedirect,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut
 } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js';
 
 const API_BASE_URL = "https://zulora-drive-backend.onrender.com";
+const HEALTH_CHECK_WINDOW_MS = 25000;
+const HEALTH_CHECK_REQUEST_TIMEOUT_MS = 8000;
 
 const firebaseConfig = {
   apiKey: 'AIzaSyBGOtawcfRqXTm7jw5P3DB0qhJCUTmfyDc',
@@ -92,15 +95,25 @@ async function getToken() {
 }
 
 async function checkBackendHealth() {
-  try {
-    const response = await fetch(`${API_BASE_URL}/api/health`, {
-      headers: { 'Bypass-Tunnel-Reminder': 'true' }
-    });
-    return response.ok;
-  } catch (error) {
-    console.warn('Backend ping failed:', error);
-    return false;
+  const deadline = Date.now() + HEALTH_CHECK_WINDOW_MS;
+  while (Date.now() < deadline) {
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), HEALTH_CHECK_REQUEST_TIMEOUT_MS);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/health`, {
+        headers: { 'Bypass-Tunnel-Reminder': 'true' },
+        signal: controller.signal
+      });
+      if (response.ok) return true;
+    } catch (error) {
+      console.warn('Backend ping failed; retrying while Render wakes up.', error);
+    } finally {
+      window.clearTimeout(timeout);
+    }
+    const remaining = deadline - Date.now();
+    if (remaining > 0) await new Promise((resolve) => window.setTimeout(resolve, Math.min(1000, remaining)));
   }
+  return false;
 }
 
 async function api(path, options = {}) {
@@ -221,7 +234,15 @@ function setupAuthInterface({ redirectToDrive = false } = {}) {
     setMessage('Connecting to Google…');
     message.textContent = '';
     try {
-      await signInWithPopup(auth, googleProvider);
+      try {
+        await signInWithPopup(auth, googleProvider);
+      } catch (error) {
+        if (['auth/popup-blocked', 'auth/operation-not-supported-in-this-environment'].includes(error.code)) {
+          await signInWithRedirect(auth, googleProvider);
+          return;
+        }
+        throw error;
+      }
       await finishAuth();
     } catch (error) {
       console.error(error);
