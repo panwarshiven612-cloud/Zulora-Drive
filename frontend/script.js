@@ -125,7 +125,7 @@ async function api(path, options = {}) {
   try {
     response = await fetch(`${path}`, { ...options, headers });
   } catch (error) {
-    throw new Error(`Cannot reach the Zulora Drive server at ${API_BASE_URL}. Ensure the backend is running.`);
+    throw new Error('Cannot reach Zulora Drive backend. Ensure the server is running.');
   }
   if (response.status === 204) return null;
   const contentType = response.headers.get('content-type') || '';
@@ -160,7 +160,7 @@ async function refreshProfile() {
 async function authenticatedBlob(file) {
   let response;
   try {
-    response = await fetch(`${API_BASE_URL}/api/files/${encodeURIComponent(file.id)}/content`, {
+    response = await fetch(`/api/files/${encodeURIComponent(file.id)}/content`, {
       headers: {
         Authorization: `Bearer ${await getToken()}`,
         'Bypass-Tunnel-Reminder': 'true'

@@ -1559,7 +1559,7 @@
 
     const ADMIN_EMAIL = 'zulora.help@gmail.com';
     const GIB = 1024 ** 3;
-    const API_BASE_URL = 'https://zulora-drive-backend.onrender.com';
+
     const HEALTH_CHECK_WINDOW_MS = 25000;
     const HEALTH_CHECK_REQUEST_TIMEOUT_MS = 8000;
 
@@ -1646,7 +1646,7 @@
         const controller = new AbortController();
         const timeout = window.setTimeout(() => controller.abort(), HEALTH_CHECK_REQUEST_TIMEOUT_MS);
         try {
-          const response = await fetch(`${API_BASE_URL}/api/health`, {
+          const response = await fetch(`/api/health`, {
             headers: { 'Bypass-Tunnel-Reminder': 'true' },
             signal: controller.signal
           });
@@ -1685,14 +1685,14 @@
 
       let response;
       try {
-        response = await fetch(`${API_BASE_URL}${endpoint}`, { ...options, headers });
+        response = await fetch(endpoint, { ...options, headers });
         // Automatically dismiss connection error banner on successful server contact
         const banner = $('#connectionErrorBanner');
         if (banner && !banner.hidden) banner.hidden = true;
       } catch (err) {
         const banner = $('#connectionErrorBanner');
         if (banner) banner.hidden = false;
-        throw new Error(`Cannot reach Zulora Drive server at ${API_BASE_URL}. Ensure backend is running.`);
+        throw new Error('Cannot reach Zulora Drive backend. Ensure the server is running.');
       }
 
       if (response.status === 204) return null;
@@ -1707,8 +1707,8 @@
     async function fetchFileBlob(file, isAdminOverride = false) {
       const token = await getIdToken();
       const url = isAdminOverride
-        ? `${API_BASE_URL}/api/admin/files/${encodeURIComponent(file.id)}/content`
-        : `${API_BASE_URL}/api/files/${encodeURIComponent(file.id)}/content`;
+        ? `/api/admin/files/${encodeURIComponent(file.id)}/content`
+        : `/api/files/${encodeURIComponent(file.id)}/content`;
 
       const response = await fetch(url, {
         headers: {
@@ -1912,7 +1912,7 @@
         formData.append('file', file, file.name);
 
         const xhr = new XMLHttpRequest();
-        xhr.open('POST', `${API_BASE_URL}/api/files`);
+        xhr.open('POST', `/api/files`);
         xhr.setRequestHeader('Authorization', `Bearer ${token}`);
         xhr.setRequestHeader('Bypass-Tunnel-Reminder', 'true');
 
