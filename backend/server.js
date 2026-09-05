@@ -345,7 +345,7 @@ const upload = multer({
     },
     filename(req, file, callback) {
       const extension = path.extname(safeOriginalName(file.originalname)).slice(0, 20);
-      callback(null, `${Date.now()}-${crypto.randomUUID()}${extension}`);
+      callback(null, `${Date.now()}-${(crypto.randomUUID ? crypto.randomUUID() : crypto.randomBytes(16).toString('hex'))}${extension}`);
     }
   }),
   limits: { fileSize: MAX_FILE_SIZE, files: 1, fields: 10 },

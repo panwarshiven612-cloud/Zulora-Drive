@@ -12,7 +12,7 @@ import {
   signOut
 } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js';
 
-const API_BASE_URL = "https://zulora-drive-backend.onrender.com";
+
 const HEALTH_CHECK_WINDOW_MS = 25000;
 const HEALTH_CHECK_REQUEST_TIMEOUT_MS = 8000;
 
@@ -100,7 +100,7 @@ async function checkBackendHealth() {
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), HEALTH_CHECK_REQUEST_TIMEOUT_MS);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/health`, {
+      const response = await fetch(`/api/health`, {
         headers: { 'Bypass-Tunnel-Reminder': 'true' },
         signal: controller.signal
       });
@@ -123,7 +123,7 @@ async function api(path, options = {}) {
   if (options.body && !(options.body instanceof FormData) && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
   let response;
   try {
-    response = await fetch(`${API_BASE_URL}${path}`, { ...options, headers });
+    response = await fetch(`${path}`, { ...options, headers });
   } catch (error) {
     throw new Error(`Cannot reach the Zulora Drive server at ${API_BASE_URL}. Ensure the backend is running.`);
   }

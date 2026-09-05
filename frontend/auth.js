@@ -52,7 +52,7 @@ setPersistence(auth, browserLocalPersistence).catch((err) =>
 
 // ─── Constants ──────────────────────────────────────────────────────────────────
 const ADMIN_EMAIL = 'zulora.help@gmail.com';
-const API_BASE_URL = 'https://zulora-drive-backend.onrender.com';
+
 
 // ─── State ──────────────────────────────────────────────────────────────────────
 let currentUser = null;
@@ -88,7 +88,7 @@ async function api(path, options = {}) {
   }
   let response;
   try {
-    response = await fetch(`${API_BASE_URL}${path}`, { ...options, headers });
+    response = await fetch(`${path}`, { ...options, headers });
   } catch {
     throw new Error(
       `Cannot reach the Zulora Drive server at ${API_BASE_URL}. ` +
