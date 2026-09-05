@@ -35,7 +35,7 @@ const ADMIN_EMAIL = 'zulora.help@gmail.com';
 const PAYMENT_UPI_ID = 'shivenpanwar@fam';
 const GIB = 1024 ** 3;
 const MAX_FILE_SIZE = Number(process.env.MAX_FILE_SIZE_BYTES || 500 * 1024 * 1024);
-const UPLOAD_ROOT = path.resolve(process.env.UPLOAD_DIR || path.join(__dirname, 'uploads'));
+const UPLOAD_ROOT = path.resolve(process.env.UPLOAD_DIR || (process.env.VERCEL ? path.join('/tmp', 'uploads') : path.join(__dirname, 'uploads')));
 const FRONTEND_ROOT = path.resolve(__dirname, '..', 'frontend');
 
 const PLANS = Object.freeze({
@@ -211,7 +211,11 @@ try {
   console.warn(`Firebase Admin unavailable: ${error.message}`);
 }
 
-fs.mkdirSync(UPLOAD_ROOT, { recursive: true });
+try {
+  fs.mkdirSync(UPLOAD_ROOT, { recursive: true });
+} catch (dirErr) {
+  console.warn(`Could not create UPLOAD_ROOT (${UPLOAD_ROOT}):`, dirErr.message);
+}
 
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
@@ -223,7 +227,7 @@ app.use(helmet({
       styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com', 'https://cdnjs.cloudflare.com'],
       fontSrc: ["'self'", 'https://fonts.gstatic.com', 'https://cdnjs.cloudflare.com', 'data:'],
       imgSrc: ["'self'", 'data:', 'blob:', 'https:'],
-      connectSrc: ["'self'", 'https://identitytoolkit.googleapis.com', 'https://securetoken.googleapis.com', 'https://www.googleapis.com', 'https://firestore.googleapis.com', 'https://zulora-drive-backend.onrender.com'],
+      connectSrc: ["'self'", 'https://identitytoolkit.googleapis.com', 'https://securetoken.googleapis.com', 'https://www.googleapis.com', 'https://firestore.googleapis.com'],
       frameSrc: ["'self'", 'https://accounts.google.com']
     }
   }
@@ -354,6 +358,13 @@ const upload = multer({
       ? callback(new ApiError(400, 'Choose a valid file name.', 'INVALID_FILE_NAME'))
       : callback(null, true);
   }
+});
+
+app.use((req, res, next) => {
+  if (process.env.VERCEL && req.url && !req.url.startsWith('/api')) {
+    req.url = '/api' + (req.url.startsWith('/') ? req.url : '/' + req.url);
+  }
+  next();
 });
 
 app.get('/api/health', (req, res) => {

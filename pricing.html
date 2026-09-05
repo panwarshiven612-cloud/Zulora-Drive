@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Simple, transparent Zulora Drive storage plans.">
+  <title>Storage plans · Zulora Drive</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body data-page="pricing">
+
+  <!-- ── Header ── -->
+  <header class="marketing-header">
+    <a class="brand" href="index.html">
+      <img src="https://i.postimg.cc/VL9RBtWh/Elegant-AI-Agency-Logo-for-Zulora-20260208-153446-0000.png" alt="Zulora logo">
+      <span>Zulora Drive<small>PRIVATE CLOUD STORAGE</small></span>
+    </a>
+    <a href="index.html" class="button ghost small"><i class="fa-solid fa-hard-drive"></i> My Drive</a>
+  </header>
+
+  <!-- ── Pricing grid ── -->
+  <main class="pricing-main">
+    <p class="eyebrow">Storage that scales with you</p>
+    <h1>Simple plans. Your files remain private.</h1>
+    <p>Choose a monthly plan, pay via UPI in one tap, then confirm your payment on WhatsApp. Your storage is upgraded once verified.</p>
+
+    <section class="pricing-grid" aria-label="Zulora Drive pricing plans">
+
+      <!-- Starter -->
+      <article class="plan glass">
+        <div class="plan-icon"><i class="fa-solid fa-rocket"></i></div>
+        <h2>Starter</h2><p class="muted">For getting started</p>
+        <div class="price">₹0 <small>/ forever</small></div>
+        <ul>
+          <li>10 GB secure storage</li>
+          <li>File preview &amp; download</li>
+          <li>Private account space</li>
+          <li>Google Sign-In included</li>
+        </ul>
+        <a class="button ghost wide" href="index.html">
+          <i class="fa-solid fa-check"></i> Included with your account
+        </a>
+      </article>
+
+      <!-- Storage Lite -->
+      <article class="plan glass">
+        <div class="plan-icon"><i class="fa-solid fa-cloud"></i></div>
+        <h2>Storage Lite</h2><p class="muted">For personal archives</p>
+        <div class="price">₹70 <small>/ month</small></div>
+        <ul>
+          <li>50 GB secure storage</li>
+          <li>Private media previews</li>
+          <li>Upgrade request tracking</li>
+          <li>Priority support</li>
+        </ul>
+        <button class="button payment-button wide" type="button"
+                data-plan="storage_lite" data-price="70" data-label="Storage Lite" data-storage="50 GB">
+          <i class="fa-solid fa-bolt"></i> Pay via UPI
+        </button>
+      </article>
+
+      <!-- Business Pro -->
+      <article class="plan glass featured">
+        <span class="plan-badge">MOST POPULAR</span>
+        <div class="plan-icon"><i class="fa-solid fa-briefcase"></i></div>
+        <h2>Business Pro</h2><p class="muted">For active workspaces</p>
+        <div class="price">₹140 <small>/ month</small></div>
+        <ul>
+          <li>100 GB secure storage</li>
+          <li>Priority upgrade processing</li>
+          <li>Full Drive capabilities</li>
+          <li>Team-ready storage</li>
+        </ul>
+        <button class="button payment-button wide" type="button"
+                data-plan="business_pro" data-price="140" data-label="Business Pro" data-storage="100 GB">
+          <i class="fa-solid fa-bolt"></i> Pay via UPI
+        </button>
+      </article>
+
+      <!-- Ultra Max -->
+      <article class="plan glass">
+        <div class="plan-icon"><i class="fa-solid fa-database"></i></div>
+        <h2>Ultra Max</h2><p class="muted">For larger libraries</p>
+        <div class="price">₹240 <small>/ month</small></div>
+        <ul>
+          <li>200 GB secure storage</li>
+          <li>Private media previews</li>
+          <li>Priority upgrade processing</li>
+          <li>Maximum personal storage</li>
+        </ul>
+        <button class="button payment-button wide" type="button"
+                data-plan="ultra_max" data-price="240" data-label="Ultra Max" data-storage="200 GB">
+          <i class="fa-solid fa-bolt"></i> Pay via UPI
+        </button>
+      </article>
+
+    </section>
+
+    <!-- Trust strip -->
+    <div class="pricing-trust">
+      <span><i class="fa-solid fa-shield-halved"></i> Private by default</span>
+      <span><i class="fa-solid fa-clock-rotate-left"></i> Activated after verification</span>
+      <span><i class="fa-brands fa-whatsapp"></i> WhatsApp support</span>
+      <span><i class="fa-solid fa-lock"></i> Firebase-secured</span>
+    </div>
+  </main>
+
+  <!-- ══════════════════════════════════════════════════════
+       STEP 1 MODAL — UPI Payment
+  ═══════════════════════════════════════════════════════ -->
+  <div id="checkoutModal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="checkoutTitle">
+    <section class="modal-card checkout">
+      <div class="modal-header">
+        <div>
+          <p class="eyebrow"><i class="fa-solid fa-circle-1"></i> Step 1 of 2 — UPI payment</p>
+          <h2 id="checkoutTitle">Complete your upgrade</h2>
+        </div>
+        <button class="icon-button" data-close-modal="checkoutModal" type="button" aria-label="Close payment dialog">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <!-- Plan pill -->
+      <div class="checkout-plan-pill">
+        <span id="checkoutPlan" class="muted"></span>
+      </div>
+
+      <!-- QR code -->
+      <img id="upiQr" class="upi-qr" alt="UPI payment QR code — scan with any UPI app">
+
+      <!-- UPI URI text -->
+      <code id="upiLink"></code>
+
+      <!-- CTA buttons -->
+      <a id="upiAppLink" class="button wide" href="#" target="_blank" rel="noopener">
+        <i class="fa-solid fa-mobile-screen-button"></i> Open in UPI App &amp; Pay
+      </a>
+
+      <p class="checkout-pay-note">
+        Pay to <strong>shivenpanwar@fam</strong> · Account: <strong id="checkoutAccount">—</strong>
+      </p>
+
+      <div class="checkout-divider"><span>Paid? Continue to WhatsApp verification →</span></div>
+
+      <button id="proceedToVerifyButton" class="button wide" type="button">
+        <i class="fa-brands fa-whatsapp"></i> I've Paid — Continue Verification
+      </button>
+    </section>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════
+       STEP 2 MODAL — WhatsApp Verification
+  ═══════════════════════════════════════════════════════ -->
+  <div id="verifyModal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="verifyTitle">
+    <section class="modal-card verify-card">
+      <div class="modal-header">
+        <div>
+          <p class="eyebrow"><i class="fa-solid fa-circle-2"></i> Step 2 of 2 — Verification</p>
+          <h2 id="verifyTitle">Confirm your payment</h2>
+        </div>
+        <button class="icon-button" data-close-modal="verifyModal" type="button" aria-label="Close verification dialog">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <p class="verify-intro">
+        Enter your transaction details below. We'll pre-fill a WhatsApp message for you — just attach your payment screenshot and send.
+      </p>
+
+      <!-- UTR field -->
+      <label for="utrInput" class="verify-label">
+        <i class="fa-solid fa-receipt"></i> UTR / Transaction ID <span class="required-star">*</span>
+      </label>
+      <input id="utrInput" type="text" maxlength="30"
+             placeholder="12-digit UTR, e.g. 506123456789"
+             class="verify-input" autocomplete="off" spellcheck="false">
+      <small class="verify-hint">Find this in your UPI app under payment history or bank SMS.</small>
+
+      <!-- Screenshot upload -->
+      <label class="verify-label" style="margin-top:1.1rem">
+        <i class="fa-solid fa-image"></i> Payment Screenshot
+      </label>
+      <div id="screenshotDropzone" class="screenshot-dropzone" role="button" tabindex="0"
+           aria-label="Click or drag to upload payment screenshot">
+        <input id="screenshotInput" type="file" accept="image/*" hidden>
+        <div id="screenshotPreview" class="screenshot-preview" hidden>
+          <img id="screenshotThumb" alt="Your screenshot preview">
+          <button id="screenshotRemove" class="screenshot-remove-btn" type="button" aria-label="Remove screenshot">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+        <div id="screenshotPlaceholder" class="screenshot-placeholder">
+          <i class="fa-solid fa-cloud-arrow-up"></i>
+          <p>Click or drag your screenshot here</p>
+          <span>PNG, JPG, WEBP · Max 10 MB</span>
+        </div>
+      </div>
+
+      <!-- WhatsApp message preview -->
+      <div class="message-preview-wrapper">
+        <p class="verify-label"><i class="fa-brands fa-whatsapp"></i> Message that will be sent</p>
+        <div id="waMessagePreview" class="wa-message-preview"></div>
+      </div>
+
+      <!-- Actions -->
+      <div class="verify-actions">
+        <button id="confirmPaymentButton" class="button wide wa-button" type="button">
+          <i class="fa-brands fa-whatsapp"></i> Confirm on WhatsApp
+        </button>
+        <button id="backToCheckoutButton" class="button ghost wide" type="button">
+          <i class="fa-solid fa-arrow-left"></i> Back to Payment
+        </button>
+      </div>
+
+      <p class="verify-footer">
+        <i class="fa-solid fa-shield-halved"></i>
+        Your upgrade request is also saved to our system. Storage activates once an admin approves.
+      </p>
+    </section>
+  </div>
+
+  <div id="toast" class="toast" hidden role="status" aria-live="polite"></div>
+  <script type="module" src="script.js"></script>
+</body>
+</html>
