@@ -1,8 +1,13 @@
 /**
- * Zulora Drive — Authentication & Firebase Client Module
+ * Zulora Drive — Authentication, Firebase Client & Auth Helpers
  *
- * Centralizes Firebase Auth v10/v11 modular SDK, token management,
- * and authenticated API interactions.
+ * Firebase Modular SDK v10 — Handles:
+ *   • Firebase App initialization with exact project credentials
+ *   • Google + Email/Password authentication
+ *   • Persistent local session management
+ *   • Authenticated API fetch wrapper
+ *   • User profile bootstrapping & realtime refresh
+ *   • Referral link tracking via URL ?ref= param & localStorage
  */
 
 import { initializeApp, getApps } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
@@ -20,7 +25,9 @@ import {
   sendPasswordResetEmail
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 
-// Exact Client Firebase Configuration
+// =============================================
+// FIREBASE CONFIG — Exact Project Credentials
+// =============================================
 const firebaseConfig = {
   apiKey: "AIzaSyBGOtawcfRqXTm7jw5P3DB0qhJCUTmfyDc",
   authDomain: "zulora-drive.firebaseapp.com",
@@ -33,32 +40,83 @@ const firebaseConfig = {
 const firebaseApp = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 const auth = getAuth(firebaseApp);
 
-// Configure Google Auth Provider
+// Google Auth Provider setup
 const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: 'select_account' });
 
-// Set persistent local browser session
+// Persist session across tabs/refreshes
 setPersistence(auth, browserLocalPersistence).catch((err) => {
-  console.warn('[Zulora Auth] Local persistence warning:', err);
+  console.warn('[ZuloraAuth] Persistence warning:', err.message);
 });
 
-const ADMIN_EMAIL = 'zulora.help@gmail.com';
+// =============================================
+// CONSTANTS
+// =============================================
+export const ADMIN_EMAIL = 'zulora.help@gmail.com';
+export const SUPPORT_PHONE = '+91 6395211325';
+export const SUPPORT_WHATSAPP = 'https://wa.me/916395211325?text=Hi%20Zulora%20Drive%20Support';
+export const SUPPORT_EMAIL = 'zulora.help@gmail.com';
+export const SUPPORT_UPI_ID = 'shivenpanwar@fam';
+export const APP_DOMAIN = 'https://drive.zulora.in';
+
+// =============================================
+// STATE
+// =============================================
 let currentUser = null;
 let currentProfile = null;
 let profileBootstrapPromise = null;
 
+// =============================================
+// IDENTITY HELPERS — Exact User Identity Spec
+// =============================================
 /**
- * Retrieves valid Firebase ID Token for authenticated requests
+ * Derives unique dedicated username:
+ * Pattern: @ + user.email.split('@')[0].toLowerCase()
  */
-export async function getIdToken(forceRefresh = false) {
-  const user = auth.currentUser || currentUser;
-  if (!user) throw new Error('Please sign in to continue.');
-  return user.getIdToken(forceRefresh);
+export function deriveUsername(user) {
+  const email = (user?.email || '').toLowerCase();
+  const prefix = email.split('@')[0].replace(/[^a-z0-9_]/g, '') || 'user';
+  return `@${prefix}`;
 }
 
 /**
- * Authenticated API Fetch Wrapper
+ * Derives unique dedicated Account ID:
+ * Pattern: ZUL- + user.uid.substring(0, 6).toUpperCase()
  */
+export function deriveAccountId(user) {
+  const uid = (user?.uid || '000000').toUpperCase();
+  return `ZUL-${uid.substring(0, 6)}`;
+}
+
+/**
+ * Returns the shareable referral link for a user:
+ * https://drive.zulora.in/?ref={USER_UID}
+ */
+export function getReferralLink(user) {
+  if (!user?.uid) return APP_DOMAIN;
+  return `${APP_DOMAIN}/?ref=${user.uid}`;
+}
+
+/**
+ * Extracts ?ref= from URL and persists to localStorage for multi-page onboarding.
+ */
+export function getReferrerUidFromUrl() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get('ref');
+    if (ref && /^[A-Za-z0-9_-]{4,}$/.test(ref)) {
+      localStorage.setItem('zulora_referrer_uid', ref);
+      return ref;
+    }
+    return localStorage.getItem('zulora_referrer_uid') || null;
+  } catch {
+    return null;
+  }
+}
+
+// =============================================
+// AUTHENTICATED API WRAPPER
+// =============================================
 export async function api(path, options = {}) {
   const token = await getIdToken();
   const headers = new Headers(options.headers || {});
@@ -73,18 +131,17 @@ export async function api(path, options = {}) {
   try {
     response = await fetch(path, { ...options, headers });
   } catch (err) {
-    console.error('[Zulora API] Fetch failed:', err);
-    throw new Error('Cannot connect to Zulora Drive server. Please check your internet connection.');
+    throw new Error('Cannot connect to Zulora Drive. Please check your internet connection.');
   }
 
   if (response.status === 204) return null;
 
   const contentType = response.headers.get('content-type') || '';
   const isJson = contentType.includes('application/json');
-  const data = isJson ? await response.json() : null;
+  const data = isJson ? await response.json().catch(() => null) : null;
 
   if (!response.ok) {
-    const errorMsg = data?.error || `API request failed with status ${response.status}.`;
+    const errorMsg = data?.error || `Request failed (${response.status}).`;
     const err = new Error(errorMsg);
     err.status = response.status;
     err.code = data?.code;
@@ -94,37 +151,43 @@ export async function api(path, options = {}) {
   return data;
 }
 
-export const SUPPORT_PHONE = '+91 6395211325';
-export const SUPPORT_WHATSAPP = 'https://wa.me/916395211325?text=Hi%20Zulora%20Drive%20Support';
-export const SUPPORT_EMAIL = 'zulora.help@gmail.com';
-export const SUPPORT_UPI_ID = 'shivenpanwar@fam';
+// =============================================
+// TOKEN
+// =============================================
+export async function getIdToken(forceRefresh = false) {
+  const user = auth.currentUser || currentUser;
+  if (!user) throw new Error('Not authenticated. Please sign in.');
+  return user.getIdToken(forceRefresh);
+}
 
-/**
- * Bootstrap or initialize user document in Firestore upon login
- */
+// =============================================
+// BOOTSTRAP & PROFILE
+// =============================================
 export async function bootstrapUser() {
   const user = auth.currentUser || currentUser;
-  if (!user) throw new Error('User not signed in.');
+  if (!user) throw new Error('Not authenticated.');
   if (currentProfile) return currentProfile;
 
-  const email = user.email || '';
-  const emailPrefix = email.split('@')[0] || 'user';
-  const uidSuffix = (user.uid || '').substring(0, 4);
-  const username = '@' + (emailPrefix.replace(/[^a-zA-Z0-9_]/g, '') + '_' + uidSuffix).toLowerCase();
-  const displayName = user.displayName || emailPrefix;
-
   if (!profileBootstrapPromise) {
+    const referrerUid = getReferrerUidFromUrl();
+
     profileBootstrapPromise = api('/api/users/me/bootstrap', {
       method: 'POST',
       body: JSON.stringify({
-        displayName: displayName,
-        username: username,
-        photoURL: user.photoURL || ''
+        displayName: user.displayName || user.email.split('@')[0],
+        username: deriveUsername(user),
+        accountId: deriveAccountId(user),
+        photoURL: user.photoURL || '',
+        referrerUid: referrerUid || null
       })
     })
       .then((res) => {
         currentProfile = res.profile;
         return currentProfile;
+      })
+      .catch((err) => {
+        console.warn('[ZuloraAuth] Bootstrap error — attempting profile refresh:', err.message);
+        return refreshProfile().catch(() => buildLocalProfile(user));
       })
       .finally(() => {
         profileBootstrapPromise = null;
@@ -133,9 +196,25 @@ export async function bootstrapUser() {
   return profileBootstrapPromise;
 }
 
-/**
- * Re-fetches latest profile (used storage, quota, plan) in realtime
- */
+function buildLocalProfile(user) {
+  const email = user?.email || '';
+  const emailPrefix = email.split('@')[0] || 'user';
+  return {
+    uid: user.uid,
+    email: user.email,
+    displayName: user.displayName || emailPrefix,
+    username: deriveUsername(user),
+    accountId: deriveAccountId(user),
+    photoURL: user.photoURL || '',
+    storageLimitBytes: 10 * 1024 * 1024 * 1024,
+    usedStorageBytes: 0,
+    planType: 'Free',
+    tier: 'free',
+    isAdmin: email.toLowerCase() === ADMIN_EMAIL,
+    _isLocalFallback: true
+  };
+}
+
 export async function refreshProfile() {
   const res = await api('/api/user/profile');
   currentProfile = res.profile;
@@ -155,11 +234,13 @@ export function setCurrentProfile(p) {
 }
 
 export function isAdmin(profile) {
-  const email = profile?.email || auth.currentUser?.email;
-  return String(email || '').trim().toLowerCase() === ADMIN_EMAIL;
+  const email = profile?.email || auth.currentUser?.email || '';
+  return email.toLowerCase().trim() === ADMIN_EMAIL;
 }
 
-// Authentication Actions
+// =============================================
+// AUTH ACTIONS
+// =============================================
 export async function signInWithGoogle() {
   try {
     return await signInWithPopup(auth, googleProvider);
@@ -201,24 +282,23 @@ export function onAuthChange(callback) {
   });
 }
 
+// =============================================
+// FRIENDLY AUTH ERROR MESSAGES
+// =============================================
 const AUTH_ERROR_MAP = {
-  'auth/invalid-credential': 'Invalid email or password.',
-  'auth/user-not-found': 'No account exists with this email.',
-  'auth/wrong-password': 'Incorrect password.',
-  'auth/email-already-in-use': 'An account already exists with this email address.',
-  'auth/weak-password': 'Password should be at least 6 characters.',
+  'auth/invalid-credential': 'Invalid email or password. Please try again.',
+  'auth/user-not-found': 'No account found with this email address.',
+  'auth/wrong-password': 'Incorrect password. Please try again.',
+  'auth/email-already-in-use': 'An account already exists with this email.',
+  'auth/weak-password': 'Password must be at least 6 characters.',
   'auth/invalid-email': 'Please enter a valid email address.',
   'auth/popup-closed-by-user': 'Google sign-in was cancelled.',
-  'auth/network-request-failed': 'Network connection issue. Please check your internet.'
+  'auth/network-request-failed': 'Network connection issue. Please check your internet.',
+  'auth/too-many-requests': 'Too many attempts. Please wait a moment and try again.'
 };
 
 export function friendlyAuthError(error) {
-  return AUTH_ERROR_MAP[error?.code] || error?.message || 'Authentication error occurred.';
+  return AUTH_ERROR_MAP[error?.code] || error?.message || 'An authentication error occurred.';
 }
 
-export {
-  auth,
-  firebaseApp,
-  firebaseConfig,
-  ADMIN_EMAIL
-};
+export { auth, firebaseApp, firebaseConfig };
