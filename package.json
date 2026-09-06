@@ -1,27 +1,8 @@
 {
   "name": "zulora-drive",
-  "version": "3.0.0",
+  "version": "1.0.0",
   "private": true,
-  "description": "Zulora Drive cloud storage application",
-  "main": "api/index.js",
-  "engines": {
-    "node": ">=20.0.0"
-  },
   "scripts": {
-    "start": "node backend/server.js",
-    "dev": "nodemon backend/server.js"
-  },
-  "dependencies": {
-    "cors": "^2.8.5",
-    "dotenv": "^16.6.1",
-    "express": "^5.1.0",
-    "firebase-admin": "^14.3.0",
-    "helmet": "^7.2.0",
-    "morgan": "^1.10.0",
-    "multer": "^2.3.0"
-  },
-  "devDependencies": {
-    "nodemon": "^3.1.10"
+    "build": "echo 'Static build bypass ready'"
   }
 }
-
