@@ -56,7 +56,7 @@ const MAX_FILE_SIZE = Number(process.env.MAX_FILE_SIZE_BYTES || 500 * 1024 * 102
 const UPLOAD_ROOT = path.resolve(
   process.env.UPLOAD_DIR || (process.env.VERCEL ? '/tmp/uploads' : path.join(__dirname, 'uploads'))
 );
-const FRONTEND_ROOT = path.resolve(__dirname, '..', 'frontend');
+const FRONTEND_ROOT = path.resolve(__dirname, '..');
 
 // =============================================
 // STORAGE PLANS
@@ -296,7 +296,7 @@ app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
 // Serverless path normalization — adds /api prefix if missing
 app.use((req, res, next) => {
-  if (req.url && !req.url.startsWith('/api') && !req.url.startsWith('/frontend')) {
+  if (req.url && !req.url.startsWith('/api')) {
     req.url = '/api' + (req.url.startsWith('/') ? req.url : `/${req.url}`);
   }
   next();
