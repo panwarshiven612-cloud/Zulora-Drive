@@ -586,6 +586,7 @@ const handleUploadFile = async (req, res, next) => {
     });
 
     return res.status(201).json({
+      success: true,
       file: fileForClient(fileRef.id, {
         originalName,
         size: req.file.size,
@@ -600,6 +601,7 @@ const handleUploadFile = async (req, res, next) => {
     return next(error);
   }
 };
+app.post('/api/upload', requireFirebase, authenticate, upload.single('file'), handleUploadFile);
 app.post('/api/files/upload', requireFirebase, authenticate, upload.single('file'), handleUploadFile);
 app.post('/api/files', requireFirebase, authenticate, upload.single('file'), handleUploadFile);
 

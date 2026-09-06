@@ -245,12 +245,11 @@ onAuthChange(async (user) => {
 });
 
 function setupUserUI(user, prof) {
-  const email = user.email || prof?.email || '';
-  const emailPrefix = email.split('@')[0] || 'user';
-  const uidSuffix = (user.uid || prof?.uid || '0000').substring(0, 4);
-  const username = prof?.username || ('@' + (emailPrefix.replace(/[^a-zA-Z0-9_]/g, '') + '_' + uidSuffix).toLowerCase());
-  const name = prof?.displayName || user.displayName || emailPrefix;
-  const initial = (name.charAt(0) || email.charAt(0) || 'U').toUpperCase();
+  const email = user.email || '';
+  const name = user.displayName || user.email.split('@')[0];
+  const username = '@' + user.email.split('@')[0];
+  const accountId = 'ZUL-' + user.uid.substring(0, 6).toUpperCase();
+  const initial = name.charAt(0).toUpperCase();
 
   userInitials.textContent = initial;
   dropdownInitials.textContent = initial;
@@ -262,7 +261,7 @@ function setupUserUI(user, prof) {
     dropdownUsernameElem.textContent = username;
   }
 
-  dropdownAccountId.textContent = `Account: ${prof?.accountId || 'ZUL-' + uidSuffix}`;
+  dropdownAccountId.textContent = accountId;
 
   if (isAdmin(prof)) {
     adminDashboardBtn.style.display = 'flex';
@@ -692,6 +691,7 @@ async function uploadFilesBatch(files) {
       });
       statusText.innerHTML = '<i class="fa-solid fa-circle-check text-success"></i>';
       progressBar.style.background = '#10b981';
+      await loadFiles();
     } catch (err) {
       statusText.innerHTML = '<i class="fa-solid fa-circle-xmark text-danger"></i>';
       progressBar.style.background = '#ef4444';
@@ -711,7 +711,6 @@ async function uploadFilesBatch(files) {
     const updatedProfile = await refreshProfile();
     updateStorageUI(updatedProfile);
   } catch (_) {}
-  await loadFiles();
 }
 
 function uploadSingleFile(file, onProgress) {
@@ -721,7 +720,7 @@ function uploadSingleFile(file, onProgress) {
       const token = await getIdToken();
       const xhr = new XMLHttpRequest();
 
-      xhr.open('POST', '/api/files/upload', true);
+      xhr.open('POST', '/api/upload', true);
       xhr.setRequestHeader('Authorization', `Bearer ${token}`);
       xhr.setRequestHeader('Bypass-Tunnel-Reminder', 'true');
 
