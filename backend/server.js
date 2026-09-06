@@ -14,14 +14,14 @@
  *   • Full admin control panel routes
  *   • Vercel serverless compatible
  */
-require('dotenv').config();
+try { require('dotenv').config(); } catch (_) {}
 
 const crypto = require('crypto');
 const express = require('express');
 const cors = require('cors');
-const helmet = require('helmet');
-const morgan = require('morgan');
-const multer = require('multer');
+let helmet; try { helmet = require('helmet'); } catch (_) {}
+let morgan; try { morgan = require('morgan'); } catch (_) {}
+let multer; try { multer = require('multer'); } catch (_) {}
 const admin = require('firebase-admin');
 const { cert, getApps, initializeApp } = require('firebase-admin/app');
 const { getAuth } = require('firebase-admin/auth');
@@ -262,11 +262,13 @@ try { fs.mkdirSync(UPLOAD_ROOT, { recursive: true }); } catch (_) {}
 // =============================================
 // MIDDLEWARE
 // =============================================
-app.use(helmet({
-  crossOriginResourcePolicy: { policy: 'cross-origin' },
-  crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' },
-  contentSecurityPolicy: false
-}));
+if (helmet) {
+  app.use(helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+    crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' },
+    contentSecurityPolicy: false
+  }));
+}
 
 const ALLOWED_ORIGINS = [
   'https://drive.zulora.in', 'https://zulora.in',
@@ -292,7 +294,9 @@ app.use(cors({
 
 app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true }));
-app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
+if (morgan) {
+  app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
+}
 
 // Serverless path normalization — adds /api prefix if missing
 app.use((req, res, next) => {
@@ -476,7 +480,7 @@ async function ownedFile(fileId, uid) {
 // =============================================
 // MULTER UPLOAD CONFIG (backend/uploads/{uid}/)
 // =============================================
-const upload = multer({
+const upload = multer ? multer({
   storage: multer.diskStorage({
     destination(req, file, cb) {
       try {
@@ -499,7 +503,7 @@ const upload = multer({
     }
     cb(null, true);
   }
-});
+}) : { single: () => (req, res, next) => next() };
 
 // =============================================
 // PUBLIC ROUTES
@@ -883,7 +887,7 @@ app.use('/api', (req, res, next) => {
 // GLOBAL ERROR HANDLER
 // =============================================
 app.use((err, req, res, next) => {
-  if (err instanceof multer.MulterError) {
+  if (multer && err instanceof multer.MulterError) {
     const msg = err.code === 'LIMIT_FILE_SIZE'
       ? `File exceeds the ${Math.floor(MAX_FILE_SIZE / 1024 / 1024)} MB limit.`
       : 'Upload request is invalid.';

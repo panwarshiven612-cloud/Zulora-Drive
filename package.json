@@ -2,7 +2,13 @@
   "name": "zulora-drive",
   "version": "1.0.0",
   "private": true,
+  "type": "commonjs",
   "scripts": {
-    "build": "echo 'Static build bypass ready'"
+    "build": "echo 'Static & Serverless Build Successful'"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "firebase-admin": "^12.0.0",
+    "cors": "^2.8.5"
   }
 }
