@@ -4,20 +4,19 @@
  * Implements:
  *   • Direct client-side Firebase Storage SDK uploads (users/{uid}/files/)
  *   • Real-time Firestore metadata sync and quota tracking
- *   • Zero Vercel serverless file-write dependencies (100% 404-free on mobile & web)
+ *   • 100% Serverless & Static: zero /api HTTP dependencies (eliminates all 404s)
  *   • Realtime auth binding directly on window load — zero placeholder flashes
  *   • Drive usage monitoring with live progress bar & quota warnings
  *   • File listing (grid/list), filters, sort, search directly from Firestore
  *   • File actions: Preview, Download, Star, Rename, Delete
- *   • Monthly storage plans & UPI payment modal
+ *   • Monthly storage plans & UPI payment modal with direct Firestore recording
  *   • Automated Referral & Dynamic Storage Reward System modal
- *   • Admin console with live quota editing
+ *   • Admin console with live quota editing directly in Firestore
  */
 
 import {
   onAuthChange,
   logOut,
-  api,
   bootstrapUser,
   refreshProfile,
   getCurrentUser,
@@ -30,7 +29,6 @@ import {
   deriveUsername,
   deriveAccountId,
   getReferralLink,
-  getIdToken,
   uploadFileToFirebaseStorage,
   storage,
   db,
@@ -38,6 +36,7 @@ import {
   deleteObject,
   collection,
   doc,
+  addDoc,
   getDocs,
   updateDoc,
   deleteDoc,
@@ -255,7 +254,7 @@ function initAuthLifecycle() {
       return;
     }
 
-    // Instantly bind identity so @username, user, and ZUL-000000 NEVER flash
+    // Instantly bind identity so placeholders never flash
     setupUserUI(user, {
       email: user.email,
       displayName: user.displayName || user.email.split('@')[0],
@@ -266,25 +265,20 @@ function initAuthLifecycle() {
     try {
       profile = await bootstrapUser();
     } catch (err) {
-      console.warn('[Zulora App] bootstrapUser failed — trying refreshProfile:', err.message);
-      try {
-        profile = await refreshProfile();
-      } catch (e2) {
-        console.warn('[Zulora App] refreshProfile fallback to local profile:', e2.message);
-        profile = {
-          uid: user.uid,
-          email: user.email,
-          displayName: user.displayName || user.email.split('@')[0] || 'User',
-          username: deriveUsername(user),
-          accountId: deriveAccountId(user),
-          photoURL: user.photoURL || '',
-          storageLimitBytes: 10 * 1024 ** 3,
-          usedStorageBytes: 0,
-          planType: 'Free',
-          tier: 'free',
-          isAdmin: (user.email || '').toLowerCase() === ADMIN_EMAIL
-        };
-      }
+      console.warn('[Zulora App] bootstrapUser notice:', err.message);
+      profile = {
+        uid: user.uid,
+        email: user.email,
+        displayName: user.displayName || user.email.split('@')[0] || 'User',
+        username: deriveUsername(user),
+        accountId: deriveAccountId(user),
+        photoURL: user.photoURL || '',
+        storageLimitBytes: 10 * 1024 ** 3,
+        usedStorageBytes: 0,
+        planType: 'Free',
+        tier: 'free',
+        isAdmin: (user.email || '').toLowerCase() === ADMIN_EMAIL
+      };
     }
 
     setupUserUI(user, profile);
@@ -338,25 +332,10 @@ async function loadUserFiles(uid) {
       };
     });
 
-    // Fallback check to /api/files if Firestore subcollection was empty
-    if (allFiles.length === 0) {
-      try {
-        const res = await api('/api/files');
-        if (Array.isArray(res?.files) && res.files.length > 0) {
-          allFiles = res.files;
-        }
-      } catch (_) {}
-    }
-
     applyFiltersAndRender();
   } catch (err) {
-    console.warn('[Zulora] Firestore direct load failed, trying API fallback:', err.message);
-    try {
-      const res = await api('/api/files');
-      allFiles = Array.isArray(res?.files) ? res.files : [];
-    } catch (_) {
-      allFiles = [];
-    }
+    console.warn('[Zulora] Firestore direct load notice:', err.message);
+    allFiles = [];
     applyFiltersAndRender();
   }
 }
@@ -375,8 +354,8 @@ function applyFiltersAndRender() {
   filteredFiles.sort((a, b) => {
     const aName = a.originalName || a.name || '';
     const bName = b.originalName || b.name || '';
-    const aDate = new Date(a.uploadedAt || a.uploadDate || 0);
-    const bDate = new Date(b.uploadedAt || b.uploadDate || 0);
+    const aDate = new Date(a.uploadedAt || 0);
+    const bDate = new Date(b.uploadedAt || 0);
     if (currentSort === 'date-desc') return bDate - aDate;
     if (currentSort === 'date-asc') return aDate - bDate;
     if (currentSort === 'name-asc') return aName.localeCompare(bName);
@@ -430,7 +409,7 @@ function renderGridView() {
         <div class="file-card-title" title="${name}" data-action="preview">${name}</div>
         <div class="file-card-meta">
           <span>${formatBytes(file.size)}</span>
-          <span>${formatDate(file.uploadedAt || file.uploadDate)}</span>
+          <span>${formatDate(file.uploadedAt)}</span>
         </div>
       </div>`;
     card.addEventListener('click', (e) => {
@@ -462,7 +441,7 @@ function renderListView() {
         </div>
       </td>
       <td style="color:var(--text-muted);font-size:0.85rem;">${formatBytes(file.size)}</td>
-      <td style="color:var(--text-muted);font-size:0.85rem;">${formatDate(file.uploadedAt || file.uploadDate)}</td>
+      <td style="color:var(--text-muted);font-size:0.85rem;">${formatDate(file.uploadedAt)}</td>
       <td style="text-align:right;">
         <button class="btn-icon star-btn ${file.isStarred ? 'starred' : ''}" type="button" data-action="toggle-star" title="Star">
           <i class="${file.isStarred ? 'fa-solid' : 'fa-regular'} fa-star"></i>
@@ -500,8 +479,8 @@ async function toggleStar(file) {
         isStarred: file.isStarred,
         updatedAt: serverTimestamp()
       });
-    } catch (_) {
-      await api(`/api/files/${file.id}`, { method: 'PATCH', body: JSON.stringify({ isStarred: file.isStarred }) }).catch(() => {});
+    } catch (err) {
+      console.warn('Star toggle error:', err.message);
     }
   }
 }
@@ -509,15 +488,13 @@ async function toggleStar(file) {
 function downloadFile(file) {
   if (file.url) {
     window.open(file.url, '_blank');
-  } else {
-    window.open(`/api/files/${file.id}/content?download=1`, '_blank');
   }
 }
 
 function openPreviewModal(file) {
   selectedFile = file;
   const name = file.originalName || file.name || 'File';
-  const url = file.url || `/api/files/${file.id}/content`;
+  const url = file.url || '';
 
   if (previewTitle) previewTitle.textContent = name;
   if (previewDownloadBtn) {
@@ -574,13 +551,7 @@ if (renameForm) {
       renameModal.classList.remove('show');
       await loadUserFiles(user?.uid);
     } catch (err) {
-      try {
-        await api(`/api/files/${selectedFile.id}`, { method: 'PATCH', body: JSON.stringify({ originalName: newName }) });
-        renameModal.classList.remove('show');
-        await loadUserFiles(user?.uid);
-      } catch (e2) {
-        alert(e2.message || 'Failed to rename file.');
-      }
+      alert(err.message || 'Failed to rename file.');
     }
   });
 }
@@ -623,11 +594,6 @@ if (confirmDeleteBtn) {
           console.warn('[Zulora] Firestore doc delete notice:', fsErr.message);
         }
       }
-
-      // 3. Fallback to API delete for legacy files
-      try {
-        await api(`/api/files/${selectedFile.id}`, { method: 'DELETE' });
-      } catch (_) {}
 
       if (deleteModal) deleteModal.classList.remove('show');
       const updated = await refreshProfile().catch(() => null);
@@ -846,7 +812,7 @@ if (logoutBtn) {
 }
 
 // =============================================
-// STORAGE UPGRADE & UPI PAYMENT
+// STORAGE UPGRADE & UPI PAYMENT (Direct Firestore)
 // =============================================
 function openPlansModal() { plansModal?.classList.add('show'); }
 
@@ -887,14 +853,28 @@ if (upiConfirmForm) {
   upiConfirmForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const utr = utrInput?.value.trim();
-    if (!utr || !activePlan) return;
+    const user = getCurrentUser();
+    if (!utr || !activePlan || !user) return;
+
     const submitBtn = document.getElementById('submitUtrBtn');
     if (submitBtn) { submitBtn.disabled = true; submitBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Submitting...'; }
+
     try {
-      await api('/api/upgrade-requests', {
-        method: 'POST',
-        body: JSON.stringify({ plan: activePlan.key, paymentReference: utr })
+      // Direct Firestore document recording
+      await addDoc(collection(db, 'upgradeRequests'), {
+        userUid: user.uid,
+        email: user.email,
+        accountId: profile?.accountId || deriveAccountId(user),
+        plan: activePlan.key,
+        planLabel: activePlan.name,
+        amount: Number(activePlan.amount),
+        paymentReference: utr,
+        upiId: SUPPORT_UPI_ID,
+        status: 'pending',
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
       });
+
       upiModal?.classList.remove('show');
       alert(`Thank you! Payment request for ${activePlan.name} (UTR: ${utr}) submitted. Storage will be activated after verification.`);
     } catch (err) {
@@ -942,30 +922,36 @@ if (copyReferralBtn) {
 }
 
 // =============================================
-// ADMIN CONSOLE
+// ADMIN CONSOLE (Direct Firestore)
 // =============================================
 if (adminDashboardBtn) {
   adminDashboardBtn.addEventListener('click', async () => {
     userDropdown?.classList.remove('show');
     adminModal?.classList.add('show');
     try {
-      const [overview, usersData] = await Promise.all([api('/api/admin/overview'), api('/api/admin/users')]);
-      if (adminTotalUsers) adminTotalUsers.textContent = overview.users || 0;
-      if (adminTotalFiles) adminTotalFiles.textContent = overview.files || 0;
-      if (adminTotalStorage) adminTotalStorage.textContent = formatBytes(overview.storageUsed || 0);
+      const usersSnap = await getDocs(collection(db, 'users'));
+      const users = usersSnap.docs.map((d) => ({ uid: d.id, ...d.data() }));
+
+      let totalStorage = 0;
+      users.forEach((u) => { totalStorage += Number(u.usedStorageBytes || u.storageUsed || 0); });
+
+      if (adminTotalUsers) adminTotalUsers.textContent = users.length;
+      if (adminTotalFiles) adminTotalFiles.textContent = '—';
+      if (adminTotalStorage) adminTotalStorage.textContent = formatBytes(totalStorage);
+
       if (adminUsersTableBody) {
         adminUsersTableBody.innerHTML = '';
-        (usersData.users || []).forEach((u) => {
+        users.forEach((u) => {
           const tr = document.createElement('tr');
           const used = formatBytes(u.usedStorageBytes || u.storageUsed || 0);
-          const limitGb = Math.round((u.storageLimitBytes || u.storageLimit || 0) / (1024 ** 3));
-          tr.innerHTML = `<td style="font-weight:500;">${u.email}</td><td>${used}</td><td><b>${limitGb} GB</b></td>
+          const limitGb = Math.round((u.storageLimitBytes || u.storageLimit || 10 * 1024 ** 3) / (1024 ** 3));
+          tr.innerHTML = `<td style="font-weight:500;">${u.email || u.uid}</td><td>${used}</td><td><b>${limitGb} GB</b></td>
             <td><button class="btn btn-azure-soft" style="height:28px;padding:0 8px;font-size:0.78rem;" data-uid="${u.uid}" data-email="${u.email}" data-limit="${limitGb}">Edit</button></td>`;
           tr.querySelector('button').addEventListener('click', () => promptEditQuota(u.uid, u.email, limitGb));
           adminUsersTableBody.appendChild(tr);
         });
       }
-    } catch (err) { alert('Admin data load failed: ' + err.message); }
+    } catch (err) { alert('Admin data load notice: ' + err.message); }
   });
 }
 
@@ -975,7 +961,14 @@ async function promptEditQuota(uid, email, currentGb) {
   const newGb = parseInt(input, 10);
   if (isNaN(newGb) || newGb < 1 || newGb > 50000) { alert('Enter a number between 1 and 50000.'); return; }
   try {
-    await api('/api/admin/update-quota', { method: 'POST', body: JSON.stringify({ uid, storageLimitGb: newGb }) });
+    const newLimit = Math.floor(newGb * 1024 ** 3);
+    await updateDoc(doc(db, 'users', uid), {
+      storageLimitBytes: newLimit,
+      storageLimit: newLimit,
+      planType: newGb > 10 ? 'Pro' : 'Free',
+      tier: newGb > 10 ? 'pro' : 'free',
+      updatedAt: serverTimestamp()
+    });
     alert(`Storage for ${email} updated to ${newGb} GB.`);
     adminDashboardBtn.click();
   } catch (err) { alert(err.message || 'Update failed.'); }

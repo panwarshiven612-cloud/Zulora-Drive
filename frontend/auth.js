@@ -1,12 +1,11 @@
 /**
  * Zulora Drive — Authentication, Firebase Client, Storage & Firestore Module
  *
- * Firebase Modular SDK v10.12.2 — Handles:
- *   • Firebase App, Auth, Cloud Storage, and Firestore initialization
- *   • Google + Email/Password authentication
- *   • Direct client-side uploads to Firebase Storage (zulora-drive.firebasestorage.app)
- *   • User profile bootstrapping & realtime refresh
- *   • Referral link tracking via URL ?ref= param & localStorage
+ * 100% Client-Side Serverless Architecture:
+ *   • Direct Firebase Authentication (Google + Email/Password)
+ *   • Direct Firebase Storage SDK uploads (zulora-drive.firebasestorage.app)
+ *   • Direct Firestore Database reads/writes (zero backend/API dependencies)
+ *   • Deterministic user identities and referral bonus automation
  */
 
 import { initializeApp, getApps } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
@@ -44,9 +43,7 @@ import {
   deleteDoc,
   serverTimestamp,
   increment,
-  query,
-  where,
-  orderBy
+  runTransaction
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
 // =============================================
@@ -75,6 +72,17 @@ setPersistence(auth, browserLocalPersistence).catch((err) => {
   console.warn('[ZuloraAuth] Persistence warning:', err.message);
 });
 
+// Compat wrapper for legacy syntax
+window.firebase = {
+  auth: () => auth,
+  storage: () => ({
+    ref: (path) => ({
+      child: (childPath) => storageRef(storage, path ? `${path}/${childPath}` : childPath)
+    })
+  }),
+  firestore: () => db
+};
+
 // =============================================
 // CONSTANTS
 // =============================================
@@ -84,6 +92,8 @@ export const SUPPORT_WHATSAPP = 'https://wa.me/916395211325?text=Hi%20Zulora%20D
 export const SUPPORT_EMAIL = 'zulora.help@gmail.com';
 export const SUPPORT_UPI_ID = 'shivenpanwar@fam';
 export const APP_DOMAIN = 'https://drive.zulora.in';
+export const DEFAULT_STORAGE_BYTES = 10 * 1024 * 1024 * 1024; // 10 GB
+export const REFERRAL_BONUS_BYTES = 5 * 1024 * 1024 * 1024;   // 5 GB
 
 // =============================================
 // STATE
@@ -93,7 +103,7 @@ let currentProfile = null;
 let profileBootstrapPromise = null;
 
 // =============================================
-// IDENTITY HELPERS — Exact User Identity Spec
+// IDENTITY HELPERS — Exact Spec
 // =============================================
 export function deriveUsername(user) {
   const email = (user?.email || '').toLowerCase();
@@ -129,9 +139,11 @@ export function getReferrerUidFromUrl() {
 // DIRECT FIREBASE STORAGE UPLOAD PIPELINE
 // =============================================
 /**
- * Uploads file directly to Firebase Storage bucket:
- * users/${user.uid}/files/${Date.now()}_${file.name}
- * Zero Vercel serverless read-only limits, zero 404 errors.
+ * Direct Client-Side Firebase Storage Upload:
+ * Stores files at: users/${user.uid}/files/${Date.now()}_${cleanName}
+ * Records metadata directly in Firestore: users/${user.uid}/files
+ * Increments quota in Firestore: users/${user.uid}
+ * 100% 404-free on mobile & web.
  */
 export function uploadFileToFirebaseStorage(file, onProgress) {
   return new Promise((resolve, reject) => {
@@ -166,14 +178,14 @@ export function uploadFileToFirebaseStorage(file, onProgress) {
         if (typeof onProgress === 'function') onProgress(progress);
       },
       (error) => {
-        console.error('[Firebase Storage] Upload error:', error);
+        console.error('[Firebase Storage] Direct upload error:', error);
         reject(error);
       },
       async () => {
         try {
           const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
 
-          // Save file metadata entry into Firestore DB under users/{uid}/files
+          // Save file metadata entry into Firestore DB
           const fileDocRef = await addDoc(collection(db, 'users', user.uid, 'files'), {
             name: file.name,
             originalName: file.name,
@@ -195,7 +207,7 @@ export function uploadFileToFirebaseStorage(file, onProgress) {
               updatedAt: serverTimestamp()
             });
           } catch (updateErr) {
-            console.warn('[Zulora] User quota increment notice:', updateErr.message);
+            console.warn('[Zulora] Quota update notice:', updateErr.message);
           }
 
           resolve({
@@ -220,53 +232,7 @@ export function uploadFileToFirebaseStorage(file, onProgress) {
 }
 
 // =============================================
-// AUTHENTICATED API WRAPPER
-// =============================================
-export async function api(path, options = {}) {
-  const token = await getIdToken();
-  const headers = new Headers(options.headers || {});
-  headers.set('Authorization', `Bearer ${token}`);
-  headers.set('Bypass-Tunnel-Reminder', 'true');
-
-  if (options.body && !(options.body instanceof FormData) && !headers.has('Content-Type')) {
-    headers.set('Content-Type', 'application/json');
-  }
-
-  let response;
-  try {
-    response = await fetch(path, { ...options, headers });
-  } catch (err) {
-    throw new Error('Cannot connect to Zulora Drive. Please check your internet connection.');
-  }
-
-  if (response.status === 204) return null;
-
-  const contentType = response.headers.get('content-type') || '';
-  const isJson = contentType.includes('application/json');
-  const data = isJson ? await response.json().catch(() => null) : null;
-
-  if (!response.ok) {
-    const errorMsg = data?.error || `Request failed (${response.status}).`;
-    const err = new Error(errorMsg);
-    err.status = response.status;
-    err.code = data?.code;
-    throw err;
-  }
-
-  return data;
-}
-
-// =============================================
-// TOKEN
-// =============================================
-export async function getIdToken(forceRefresh = false) {
-  const user = auth.currentUser || currentUser;
-  if (!user) throw new Error('Not authenticated. Please sign in.');
-  return user.getIdToken(forceRefresh);
-}
-
-// =============================================
-// BOOTSTRAP & PROFILE
+// DIRECT FIRESTORE PROFILE & REFERRAL BOOTSTRAP
 // =============================================
 export async function bootstrapUser() {
   const user = auth.currentUser || currentUser;
@@ -274,88 +240,163 @@ export async function bootstrapUser() {
   if (currentProfile) return currentProfile;
 
   if (!profileBootstrapPromise) {
-    const referrerUid = getReferrerUidFromUrl();
+    profileBootstrapPromise = (async () => {
+      const userRef = doc(db, 'users', user.uid);
+      const userSnap = await getDoc(userRef).catch(() => null);
 
-    profileBootstrapPromise = api('/api/users/me/bootstrap', {
-      method: 'POST',
-      body: JSON.stringify({
-        displayName: user.displayName || user.email.split('@')[0],
-        username: deriveUsername(user),
-        accountId: deriveAccountId(user),
-        photoURL: user.photoURL || '',
-        referrerUid: referrerUid || null
-      })
-    })
-      .then((res) => {
-        currentProfile = res.profile;
+      const email = user.email || '';
+      const emailPrefix = email.split('@')[0] || 'user';
+      const displayName = user.displayName || emailPrefix;
+      const username = deriveUsername(user);
+      const accountId = deriveAccountId(user);
+      const referrerUid = getReferrerUidFromUrl();
+
+      if (userSnap && userSnap.exists()) {
+        const d = userSnap.data();
+        currentProfile = {
+          uid: user.uid,
+          email,
+          displayName: d.displayName || displayName,
+          username: d.username || username,
+          accountId: d.accountId || accountId,
+          photoURL: d.photoURL || user.photoURL || '',
+          storageLimitBytes: Number(d.storageLimitBytes || d.storageLimit || DEFAULT_STORAGE_BYTES),
+          usedStorageBytes: Number(d.usedStorageBytes || d.storageUsed || 0),
+          storageLimit: Number(d.storageLimitBytes || d.storageLimit || DEFAULT_STORAGE_BYTES),
+          storageUsed: Number(d.usedStorageBytes || d.storageUsed || 0),
+          planType: d.planType || 'Free',
+          tier: d.tier || 'free',
+          totalReferrals: Number(d.totalReferrals || 0),
+          referralBonusBytes: Number(d.referralBonusBytes || 0),
+          referralLink: getReferralLink(user),
+          isAdmin: email.toLowerCase() === ADMIN_EMAIL
+        };
         return currentProfile;
-      })
-      .catch((err) => {
-        console.warn('[ZuloraAuth] Bootstrap error — attempting profile refresh:', err.message);
-        return refreshProfile().catch(() => buildLocalProfile(user));
-      })
-      .finally(() => {
-        profileBootstrapPromise = null;
-      });
+      }
+
+      // Create new user profile document directly in Firestore
+      const newProfile = {
+        uid: user.uid,
+        email,
+        displayName,
+        username,
+        accountId,
+        photoURL: user.photoURL || '',
+        storageLimitBytes: DEFAULT_STORAGE_BYTES,
+        usedStorageBytes: 0,
+        storageLimit: DEFAULT_STORAGE_BYTES,
+        storageUsed: 0,
+        planType: 'Free',
+        tier: 'free',
+        totalReferrals: 0,
+        referralBonusBytes: 0,
+        referredBy: (referrerUid && referrerUid !== user.uid) ? referrerUid : null,
+        referralProcessed: false,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      };
+
+      try {
+        await setDoc(userRef, newProfile, { merge: true });
+      } catch (err) {
+        console.warn('[Zulora] Firestore setDoc notice:', err.message);
+      }
+
+      // Automatic referral bonus processing
+      if (referrerUid && referrerUid !== user.uid) {
+        applyReferralBonus(user.uid, referrerUid).catch((e) =>
+          console.warn('[Zulora] Referral bonus application notice:', e.message)
+        );
+      }
+
+      currentProfile = {
+        ...newProfile,
+        referralLink: getReferralLink(user),
+        isAdmin: email.toLowerCase() === ADMIN_EMAIL
+      };
+
+      return currentProfile;
+    })().finally(() => {
+      profileBootstrapPromise = null;
+    });
   }
+
   return profileBootstrapPromise;
 }
 
-function buildLocalProfile(user) {
-  const email = user?.email || '';
-  const emailPrefix = email.split('@')[0] || 'user';
-  return {
-    uid: user.uid,
-    email: user.email,
-    displayName: user.displayName || emailPrefix,
-    username: deriveUsername(user),
-    accountId: deriveAccountId(user),
-    photoURL: user.photoURL || '',
-    storageLimitBytes: 10 * 1024 * 1024 * 1024,
-    usedStorageBytes: 0,
-    planType: 'Free',
-    tier: 'free',
-    isAdmin: email.toLowerCase() === ADMIN_EMAIL,
-    _isLocalFallback: true
-  };
+/**
+ * Applies +5GB bonus to both the new user and referrer directly in Firestore
+ */
+async function applyReferralBonus(newUserUid, referrerUid) {
+  try {
+    const newUserRef = doc(db, 'users', newUserUid);
+    const referrerRef = doc(db, 'users', referrerUid);
+
+    await runTransaction(db, async (tx) => {
+      const [newSnap, refSnap] = await Promise.all([tx.get(newUserRef), tx.get(referrerRef)]);
+      if (!newSnap.exists() || !refSnap.exists()) return;
+      if (newSnap.data().referralProcessed) return; // idempotent
+
+      const newLimit = Number(newSnap.data().storageLimitBytes || DEFAULT_STORAGE_BYTES) + REFERRAL_BONUS_BYTES;
+      const refLimit = Number(refSnap.data().storageLimitBytes || DEFAULT_STORAGE_BYTES) + REFERRAL_BONUS_BYTES;
+
+      tx.update(newUserRef, {
+        storageLimitBytes: newLimit,
+        storageLimit: newLimit,
+        referralBonusBytes: increment(REFERRAL_BONUS_BYTES),
+        referralProcessed: true,
+        updatedAt: serverTimestamp()
+      });
+
+      tx.update(referrerRef, {
+        storageLimitBytes: refLimit,
+        storageLimit: refLimit,
+        referralBonusBytes: increment(REFERRAL_BONUS_BYTES),
+        totalReferrals: increment(1),
+        updatedAt: serverTimestamp()
+      });
+    });
+
+    console.info(`[Zulora] Referral bonus awarded: new=${newUserUid}, referrer=${referrerUid}`);
+  } catch (err) {
+    console.warn('[Zulora] Referral transaction notice:', err.message);
+  }
 }
 
 export async function refreshProfile() {
+  const user = auth.currentUser || currentUser;
+  if (!user) throw new Error('Not authenticated.');
+
   try {
-    const res = await api('/api/user/profile');
-    currentProfile = res.profile;
-    return currentProfile;
-  } catch (apiErr) {
-    // Direct Firestore fallback for profile reading
-    const user = auth.currentUser || currentUser;
-    if (user) {
-      try {
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
-        if (userDoc.exists()) {
-          const d = userDoc.data();
-          currentProfile = {
-            uid: user.uid,
-            email: user.email,
-            displayName: d.displayName || user.displayName || user.email.split('@')[0],
-            username: d.username || deriveUsername(user),
-            accountId: d.accountId || deriveAccountId(user),
-            photoURL: d.photoURL || user.photoURL || '',
-            storageLimitBytes: Number(d.storageLimitBytes || d.storageLimit || 10 * 1024 ** 3),
-            usedStorageBytes: Number(d.usedStorageBytes || d.storageUsed || 0),
-            storageLimit: Number(d.storageLimitBytes || d.storageLimit || 10 * 1024 ** 3),
-            storageUsed: Number(d.usedStorageBytes || d.storageUsed || 0),
-            planType: d.planType || 'Free',
-            tier: d.tier || 'free',
-            totalReferrals: Number(d.totalReferrals || 0),
-            referralBonusBytes: Number(d.referralBonusBytes || 0),
-            isAdmin: user.email.toLowerCase() === ADMIN_EMAIL
-          };
-          return currentProfile;
-        }
-      } catch (_) {}
+    const snap = await getDoc(doc(db, 'users', user.uid));
+    if (snap.exists()) {
+      const d = snap.data();
+      const email = user.email || '';
+      currentProfile = {
+        uid: user.uid,
+        email,
+        displayName: d.displayName || user.displayName || email.split('@')[0],
+        username: d.username || deriveUsername(user),
+        accountId: d.accountId || deriveAccountId(user),
+        photoURL: d.photoURL || user.photoURL || '',
+        storageLimitBytes: Number(d.storageLimitBytes || d.storageLimit || DEFAULT_STORAGE_BYTES),
+        usedStorageBytes: Number(d.usedStorageBytes || d.storageUsed || 0),
+        storageLimit: Number(d.storageLimitBytes || d.storageLimit || DEFAULT_STORAGE_BYTES),
+        storageUsed: Number(d.usedStorageBytes || d.storageUsed || 0),
+        planType: d.planType || 'Free',
+        tier: d.tier || 'free',
+        totalReferrals: Number(d.totalReferrals || 0),
+        referralBonusBytes: Number(d.referralBonusBytes || 0),
+        referralLink: getReferralLink(user),
+        isAdmin: email.toLowerCase() === ADMIN_EMAIL
+      };
+      return currentProfile;
     }
-    throw apiErr;
+  } catch (err) {
+    console.warn('[Zulora] refreshProfile notice:', err.message);
   }
+
+  return currentProfile || bootstrapUser();
 }
 
 export function getCurrentUser() {
