@@ -32,6 +32,8 @@ const app = express();
 const PORT = Number(process.env.PORT || 5000);
 const ADMIN_EMAIL = 'zulora.help@gmail.com';
 const PAYMENT_UPI_ID = 'shivenpanwar@fam';
+const SUPPORT_PHONE = '+91 6395211325';
+const SUPPORT_WHATSAPP = 'https://wa.me/916395211325?text=Hi%20Zulora%20Drive%20Support';
 const GIB = 1024 ** 3;
 const DEFAULT_STORAGE_LIMIT_BYTES = 10 * GIB; // 10 GB default
 const MAX_FILE_SIZE = Number(process.env.MAX_FILE_SIZE_BYTES || 500 * 1024 * 1024);
@@ -102,8 +104,8 @@ function asSafeSegment(value) {
 }
 
 function userDirectory(uid) {
-  const directory = path.resolve(UPLOAD_ROOT, asSafeSegment(uid));
-  if (!directory.startsWith(`${UPLOAD_ROOT}${path.sep}`) && directory !== UPLOAD_ROOT) {
+  const directory = path.resolve(UPLOAD_ROOT, 'users', asSafeSegment(uid), 'files');
+  if (!directory.startsWith(UPLOAD_ROOT)) {
     throw new ApiError(400, 'Invalid user storage path.', 'INVALID_STORAGE_PATH');
   }
   return directory;
@@ -161,11 +163,18 @@ function profileForClient(profile) {
   const planType = profile.planType || (storageLimit > DEFAULT_STORAGE_LIMIT_BYTES ? 'Pro' : 'Free');
   const tier = profile.tier || (storageLimit > DEFAULT_STORAGE_LIMIT_BYTES ? 'pro' : 'free');
 
+  const email = profile.email || '';
+  const emailPrefix = email.split('@')[0] || 'user';
+  const uidSuffix = String(profile.uid || '0000').substring(0, 4);
+  const username = profile.username || ('@' + (emailPrefix + '_' + uidSuffix).toLowerCase());
+  const displayName = profile.displayName || emailPrefix;
+
   return {
     uid: profile.uid,
     accountId: profile.accountId,
     email: profile.email,
-    displayName: profile.displayName || '',
+    displayName: displayName,
+    username: username,
     photoURL: profile.photoURL || '',
     storageLimitBytes: storageLimit,
     usedStorageBytes: storageUsed,
@@ -362,7 +371,10 @@ function requireAdmin(req, res, next) {
 
 async function bootstrapProfile(user, input = {}) {
   const userRef = db.collection('users').doc(user.uid);
-  const requestedName = String(input.displayName || user.name || user.email.split('@')[0]).trim().slice(0, 80);
+  const emailPrefix = String(user.email || '').split('@')[0] || 'user';
+  const uidSuffix = String(user.uid || crypto.randomInt(1000, 9999)).substring(0, 4);
+  const generatedUsername = input.username || ('@' + (emailPrefix.replace(/[^a-zA-Z0-9_]/g, '') + '_' + uidSuffix).toLowerCase());
+  const requestedName = String(input.displayName || user.name || emailPrefix).trim().slice(0, 80);
   const requestedPhoto = String(input.photoURL || user.picture || '').trim().slice(0, 1000);
 
   for (let attempt = 0; attempt < 12; attempt += 1) {
@@ -376,6 +388,7 @@ async function bootstrapProfile(user, input = {}) {
         const updates = { updatedAt: FieldValue.serverTimestamp() };
         if (input.displayName && requestedName) updates.displayName = requestedName;
         if (input.photoURL && requestedPhoto) updates.photoURL = requestedPhoto;
+        if (!current.username) updates.username = generatedUsername;
         if (Object.keys(updates).length > 1) transaction.update(userRef, updates);
         return { ...current, ...updates, uid: user.uid, email: user.email };
       }
@@ -386,6 +399,7 @@ async function bootstrapProfile(user, input = {}) {
         accountId,
         email: user.email,
         displayName: requestedName,
+        username: generatedUsername,
         photoURL: requestedPhoto,
         storageLimitBytes: DEFAULT_STORAGE_LIMIT_BYTES,
         usedStorageBytes: 0,
@@ -462,7 +476,9 @@ app.get('/api/plans', (req, res) => {
   res.json({
     plans: Object.values(PLANS),
     paymentUpiId: PAYMENT_UPI_ID,
-    supportEmail: ADMIN_EMAIL
+    supportEmail: ADMIN_EMAIL,
+    supportPhone: SUPPORT_PHONE,
+    supportWhatsApp: SUPPORT_WHATSAPP
   });
 });
 

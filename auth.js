@@ -94,19 +94,32 @@ export async function api(path, options = {}) {
   return data;
 }
 
+export const SUPPORT_PHONE = '+91 6395211325';
+export const SUPPORT_WHATSAPP = 'https://wa.me/916395211325?text=Hi%20Zulora%20Drive%20Support';
+export const SUPPORT_EMAIL = 'zulora.help@gmail.com';
+export const SUPPORT_UPI_ID = 'shivenpanwar@fam';
+
 /**
  * Bootstrap or initialize user document in Firestore upon login
  */
 export async function bootstrapUser() {
-  if (!auth.currentUser) throw new Error('User not signed in.');
+  const user = auth.currentUser || currentUser;
+  if (!user) throw new Error('User not signed in.');
   if (currentProfile) return currentProfile;
+
+  const email = user.email || '';
+  const emailPrefix = email.split('@')[0] || 'user';
+  const uidSuffix = (user.uid || '').substring(0, 4);
+  const username = '@' + (emailPrefix.replace(/[^a-zA-Z0-9_]/g, '') + '_' + uidSuffix).toLowerCase();
+  const displayName = user.displayName || emailPrefix;
 
   if (!profileBootstrapPromise) {
     profileBootstrapPromise = api('/api/users/me/bootstrap', {
       method: 'POST',
       body: JSON.stringify({
-        displayName: auth.currentUser.displayName || '',
-        photoURL: auth.currentUser.photoURL || ''
+        displayName: displayName,
+        username: username,
+        photoURL: user.photoURL || ''
       })
     })
       .then((res) => {

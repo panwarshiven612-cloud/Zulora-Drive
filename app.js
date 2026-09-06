@@ -245,14 +245,24 @@ onAuthChange(async (user) => {
 });
 
 function setupUserUI(user, prof) {
-  const name = prof?.displayName || user.displayName || user.email.split('@')[0];
-  const initial = name.charAt(0).toUpperCase();
+  const email = user.email || prof?.email || '';
+  const emailPrefix = email.split('@')[0] || 'user';
+  const uidSuffix = (user.uid || prof?.uid || '0000').substring(0, 4);
+  const username = prof?.username || ('@' + (emailPrefix.replace(/[^a-zA-Z0-9_]/g, '') + '_' + uidSuffix).toLowerCase());
+  const name = prof?.displayName || user.displayName || emailPrefix;
+  const initial = (name.charAt(0) || email.charAt(0) || 'U').toUpperCase();
 
   userInitials.textContent = initial;
   dropdownInitials.textContent = initial;
   dropdownName.textContent = name;
-  dropdownEmail.textContent = user.email;
-  dropdownAccountId.textContent = `Account: ${prof?.accountId || 'ZUL-DIRECT'}`;
+  dropdownEmail.textContent = email;
+
+  const dropdownUsernameElem = document.getElementById('dropdownUsername');
+  if (dropdownUsernameElem) {
+    dropdownUsernameElem.textContent = username;
+  }
+
+  dropdownAccountId.textContent = `Account: ${prof?.accountId || 'ZUL-' + uidSuffix}`;
 
   if (isAdmin(prof)) {
     adminDashboardBtn.style.display = 'flex';
@@ -870,7 +880,7 @@ function openUpiPayment(planKey, planName, amount) {
   upiQrCodeImg.src = qrApiUrl;
 
   // WhatsApp link with prefilled context
-  const whatsappUrl = `https://wa.me/919999999999?text=Hello%20Zulora%20Support%2C%20I%20have%20paid%20%E2%82%B9${amount}%20for%20${encodeURIComponent(planName)}%20storage%20upgrade.`;
+  const whatsappUrl = `https://wa.me/916395211325?text=Hi%20Zulora%20Drive%20Support%2C%20I%20have%20paid%20%E2%82%B9${amount}%20for%20${encodeURIComponent(planName)}%20storage%20upgrade.`;
   document.getElementById('whatsappHelpLink').href = whatsappUrl;
 
   utrInput.value = '';

@@ -54,7 +54,7 @@
           <span>Upgrade</span>
         </button>
 
-        <a href="https://wa.me/919999999999?text=Hello%20Zulora%20Drive%20Support" target="_blank" rel="noopener noreferrer" class="help-link" aria-label="WhatsApp Support">
+        <a href="https://wa.me/916395211325?text=Hi%20Zulora%20Drive%20Support" target="_blank" rel="noopener noreferrer" class="help-link" aria-label="WhatsApp Support">
           <i class="fa-brands fa-whatsapp" style="color: #16a34a; font-size: 1.1rem;"></i>
           <span>Help</span>
         </a>
@@ -71,8 +71,9 @@
                 <span id="dropdownInitials">U</span>
               </div>
               <div class="user-dropdown-info">
-                <h4 id="dropdownName">User</h4>
-                <p id="dropdownEmail">user@example.com</p>
+                <h4 id="dropdownName">Authenticated User</h4>
+                <div id="dropdownUsername" style="font-size: 0.8rem; color: var(--azure-primary); font-weight: 600; font-family: var(--font-mono);">@username</div>
+                <p id="dropdownEmail" style="font-size: 0.76rem; color: var(--text-muted); word-break: break-all;">user</p>
                 <span id="dropdownPlanBadge" class="user-dropdown-badge">Free (10 GB)</span>
               </div>
             </div>
@@ -156,9 +157,13 @@
 
         <!-- Sidebar Direct Support Integration -->
         <div class="sidebar-support">
-          <a href="https://wa.me/919999999999?text=Hello%20Zulora%20Drive%20Support" target="_blank" rel="noopener noreferrer" class="support-link-btn whatsapp-btn">
+          <a href="https://wa.me/916395211325?text=Hi%20Zulora%20Drive%20Support" target="_blank" rel="noopener noreferrer" class="support-link-btn whatsapp-btn">
             <i class="fa-brands fa-whatsapp"></i>
             <span>WhatsApp Support</span>
+          </a>
+          <a href="tel:+916395211325" class="support-link-btn">
+            <i class="fa-solid fa-phone" style="color: var(--azure-primary);"></i>
+            <span>+91 6395211325</span>
           </a>
           <a href="mailto:zulora.help@gmail.com" class="support-link-btn">
             <i class="fa-regular fa-envelope"></i>
@@ -436,11 +441,16 @@
           </button>
         </form>
 
-        <div style="font-size: 0.8rem; color: var(--text-muted); text-align: center; border-top: 1px solid var(--border-soft); padding-top: 10px;">
-          Need immediate activation? 
-          <a id="whatsappHelpLink" href="https://wa.me/919999999999?text=Hello%2C%20I%20completed%20the%20UPI%20payment%20for%20Zulora%20Drive" target="_blank" rel="noopener noreferrer" style="color: #15803d; font-weight: 600;">
-            <i class="fa-brands fa-whatsapp"></i> Chat with Support on WhatsApp
-          </a>
+        <div style="font-size: 0.8rem; color: var(--text-muted); text-align: center; border-top: 1px solid var(--border-soft); padding-top: 10px; display: flex; flex-direction: column; gap: 6px; align-items: center;">
+          <span>Need immediate activation or assistance?</span>
+          <div style="display: flex; align-items: center; justify-content: center; gap: 14px; flex-wrap: wrap;">
+            <a id="whatsappHelpLink" href="https://wa.me/916395211325?text=Hi%20Zulora%20Drive%20Support%2C%20I%20completed%20the%20UPI%20payment%20for%20Zulora%20Drive" target="_blank" rel="noopener noreferrer" style="color: #15803d; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">
+              <i class="fa-brands fa-whatsapp"></i> Chat on WhatsApp
+            </a>
+            <a href="tel:+916395211325" style="color: var(--azure-primary); font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">
+              <i class="fa-solid fa-phone"></i> Call +91 6395211325
+            </a>
+          </div>
         </div>
       </div>
     </div>
