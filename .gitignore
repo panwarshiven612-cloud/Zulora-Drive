@@ -1,9 +1,0 @@
-node_modules/
-.env
-firebase-adminsdk.json
-uploads/
-backend/serviceAccountKey.json
-backend/serviceAccountKet.json
-serviceAccountKey.json
-**/serviceAccount*.json
-**/firebase-adminsdk*.json
