@@ -42,7 +42,8 @@ export const SUPPORT_WHATSAPP = 'https://wa.me/916395211325?text=Hi%20Zulora%20D
 export const SUPPORT_EMAIL = 'zulora.help@gmail.com';
 export const SUPPORT_UPI_ID = 'shivenpanwar@fam';
 export const APP_DOMAIN = 'https://drive.zulora.in';
-export const DEFAULT_STORAGE_BYTES = 10 * 1024 * 1024 * 1024; // 10 GB Free
+export const DEFAULT_STORAGE_BYTES = 5 * 1024 * 1024 * 1024; // 5 GB Free Starter
+export const MAX_STARTER_FILE_BYTES = 500 * 1024 * 1024; // 500 MB max single file limit for Starter
 export const REFERRAL_BONUS_BYTES = 5 * 1024 * 1024 * 1024;   // 5 GB Bonus
 
 let currentUser = null;
@@ -424,3 +425,21 @@ const AUTH_ERROR_MAP = {
 export function friendlyAuthError(error) {
   return AUTH_ERROR_MAP[error?.code] || error?.message || 'An authentication error occurred.';
 }
+
+// =============================================
+// ADMIN QUOTA OVERRIDE TOOL
+// =============================================
+export async function updateUserQuota(targetUid, newLimitBytes) {
+  if (!targetUid || !newLimitBytes) throw new Error('Invalid UID or limit parameter.');
+  const userRef = doc(db, 'users', targetUid);
+  await updateDoc(userRef, {
+    storageLimitBytes: Number(newLimitBytes),
+    storageLimit: Number(newLimitBytes),
+    updatedAt: serverTimestamp()
+  });
+  if (currentProfile && currentProfile.uid === targetUid) {
+    currentProfile.storageLimitBytes = Number(newLimitBytes);
+    currentProfile.storageLimit = Number(newLimitBytes);
+  }
+}
+

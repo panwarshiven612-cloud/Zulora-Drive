@@ -1,16 +1,18 @@
 /**
  * Zulora Drive — Primary Application Logic
+ * Google Drive + TeraBox Hybrid Cloud Experience
  *
  * Direct Firebase Web SDK v10 (Auth + Firestore + Storage):
  *   • Direct client-side Cloud Storage uploads (users/{uid}/files/)
+ *   • Single file limit check (500 MB max for Starter tier)
+ *   • TeraBox style segmented Storage Usage Meter & category breakdown
+ *   • Google Drive style sidebar navigation & top filter chips
  *   • Direct Firestore metadata sync and quota tracking
- *   • 100% Static & Serverless deployment (zero 404 build issues)
- *   • Real-time drive usage monitoring & progress ring
- *   • File grid / list views, categories, search, sorting
- *   • File actions: Preview, Download, Star, Rename, Delete
- *   • Monthly storage plans & UPI payment modal with direct Firestore recording
- *   • Referral & Free Storage bonus modal (+5 GB)
- *   • Admin console for quota management
+ *   • Instant Grid / List view switcher
+ *   • Quick preview modal for images, videos, audio, PDFs, and text
+ *   • Exact pricing plans: Starter (Free), Storage Lite (₹70), Business Pro (₹140), Ultra Max (₹240)
+ *   • UPI Payment confirmation with QR code & "Verify & Activate on WhatsApp"
+ *   • Admin console & quota override tools for zulora.help@gmail.com
  */
 
 import {
@@ -25,10 +27,13 @@ import {
   SUPPORT_WHATSAPP,
   SUPPORT_EMAIL,
   SUPPORT_UPI_ID,
+  DEFAULT_STORAGE_BYTES,
+  MAX_STARTER_FILE_BYTES,
   deriveUsername,
   deriveAccountId,
   getReferralLink,
-  uploadFileToFirebaseStorage
+  uploadFileToFirebaseStorage,
+  updateUserQuota
 } from './auth.js';
 
 import {
@@ -47,7 +52,7 @@ import {
 } from './firebase-config.js';
 
 // =============================================
-// GLOBAL STATE
+// GLOBAL APPLICATION STATE
 // =============================================
 let allFiles = [];
 let filteredFiles = [];
@@ -66,6 +71,7 @@ const mobileMenuBtn = document.getElementById('mobileMenuBtn');
 const appSidebar = document.getElementById('appSidebar');
 const globalSearchInput = document.getElementById('globalSearchInput');
 const searchClearBtn = document.getElementById('searchClearBtn');
+
 const userAvatarBtn = document.getElementById('userAvatarBtn');
 const userInitials = document.getElementById('userInitials');
 const userDropdown = document.getElementById('userDropdown');
@@ -77,21 +83,31 @@ const dropdownAccountId = document.getElementById('dropdownAccountId');
 const dropdownPlanBadge = document.getElementById('dropdownPlanBadge');
 const dropdownUpgradeBtn = document.getElementById('dropdownUpgradeBtn');
 const openPlansModalBtn = document.getElementById('openPlansModalBtn');
+const headerUpgradeBtn = document.getElementById('headerUpgradeBtn');
 const sidebarUpgradeBtn = document.getElementById('sidebarUpgradeBtn');
 const bannerUpgradeBtn = document.getElementById('bannerUpgradeBtn');
 const adminDashboardBtn = document.getElementById('adminDashboardBtn');
 const logoutBtn = document.getElementById('logoutBtn');
+
 const newUploadBtn = document.getElementById('newUploadBtn');
 const emptyUploadBtn = document.getElementById('emptyUploadBtn');
 const fileUploadInput = document.getElementById('fileUploadInput');
+
 const storagePercentText = document.getElementById('storagePercentText');
 const storageProgressBar = document.getElementById('storageProgressBar');
+const segPhotos = document.getElementById('segPhotos');
+const segDocs = document.getElementById('segDocs');
+const segMedia = document.getElementById('segMedia');
+const segAudio = document.getElementById('segAudio');
+const segOther = document.getElementById('segOther');
 const storageUsageDetails = document.getElementById('storageUsageDetails');
 const quotaWarningBanner = document.getElementById('quotaWarningBanner');
 const quotaWarningText = document.getElementById('quotaWarningText');
+
 const mainWorkspace = document.getElementById('mainWorkspace');
 const dropzoneOverlay = document.getElementById('dropzoneOverlay');
 const currentViewTitle = document.getElementById('currentViewTitle');
+const fileCountBadge = document.getElementById('fileCountBadge');
 const sortBySelect = document.getElementById('sortBySelect');
 const viewGridBtn = document.getElementById('viewGridBtn');
 const viewListBtn = document.getElementById('viewListBtn');
@@ -99,10 +115,12 @@ const filesGrid = document.getElementById('filesGrid');
 const filesListContainer = document.getElementById('filesListContainer');
 const filesTableBody = document.getElementById('filesTableBody');
 const emptyState = document.getElementById('emptyState');
+
 const uploadDrawer = document.getElementById('uploadDrawer');
 const uploadDrawerStatus = document.getElementById('uploadDrawerStatus');
 const uploadDrawerBody = document.getElementById('uploadDrawerBody');
 const closeUploadDrawerBtn = document.getElementById('closeUploadDrawerBtn');
+
 const plansModal = document.getElementById('plansModal');
 const upiModal = document.getElementById('upiModal');
 const upiModalPlanTitle = document.getElementById('upiModalPlanTitle');
@@ -110,31 +128,38 @@ const upiModalAmountText = document.getElementById('upiModalAmountText');
 const upiQrCodeImg = document.getElementById('upiQrCodeImg');
 const copyUpiBtn = document.getElementById('copyUpiBtn');
 const payUpiDeepLink = document.getElementById('payUpiDeepLink');
+const whatsappVerifyBtn = document.getElementById('whatsappVerifyBtn');
 const upiConfirmForm = document.getElementById('upiConfirmForm');
 const utrInput = document.getElementById('utrInput');
+
 const previewModal = document.getElementById('previewModal');
 const previewTitle = document.getElementById('previewTitle');
 const previewContainer = document.getElementById('previewContainer');
 const previewDownloadBtn = document.getElementById('previewDownloadBtn');
+
 const renameModal = document.getElementById('renameModal');
 const renameForm = document.getElementById('renameForm');
 const renameInput = document.getElementById('renameInput');
+
 const deleteModal = document.getElementById('deleteModal');
 const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
-const adminModal = document.getElementById('adminModal');
-const adminTotalUsers = document.getElementById('adminTotalUsers');
-const adminTotalFiles = document.getElementById('adminTotalFiles');
-const adminTotalStorage = document.getElementById('adminTotalStorage');
-const adminUsersTableBody = document.getElementById('adminUsersTableBody');
-const fileContextMenu = document.getElementById('fileContextMenu');
+
 const referralModal = document.getElementById('referralModal');
 const referralLinkInput = document.getElementById('referralLinkInput');
 const copyReferralBtn = document.getElementById('copyReferralBtn');
 const referralStatsText = document.getElementById('referralStatsText');
 const shareReferralWaBtn = document.getElementById('shareReferralWaBtn');
 
+const adminModal = document.getElementById('adminModal');
+const adminTotalUsers = document.getElementById('adminTotalUsers');
+const adminTotalFiles = document.getElementById('adminTotalFiles');
+const adminTotalStorage = document.getElementById('adminTotalStorage');
+const adminUsersTableBody = document.getElementById('adminUsersTableBody');
+
+const fileContextMenu = document.getElementById('fileContextMenu');
+
 // =============================================
-// UTILITY FUNCTIONS
+// FORMATTING HELPERS
 // =============================================
 function formatBytes(bytes, decimals = 1) {
   if (!bytes || bytes === 0) return '0 B';
@@ -148,75 +173,143 @@ function formatDate(iso) {
   if (!iso) return 'Just now';
   const d = new Date(iso);
   return d.toLocaleDateString('en-IN', {
-    month: 'short', day: 'numeric',
-    year: d.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric'
   });
 }
 
-function getFileCategory(mimetype, filename = '') {
-  const m = String(mimetype || '').toLowerCase();
-  const ext = String(filename).split('.').pop().toLowerCase();
-  if (m.startsWith('image/') || ['jpg','jpeg','png','gif','svg','webp','avif'].includes(ext)) return 'images';
-  if (m.startsWith('video/') || ['mp4','mkv','webm','mov','avi','m4v'].includes(ext)) return 'videos';
-  if (m.startsWith('audio/') || ['mp3','wav','ogg','m4a','flac'].includes(ext)) return 'audio';
-  if (['zip','rar','7z','tar','gz'].includes(ext) || m.includes('zip') || m.includes('compressed')) return 'archives';
-  if (m.includes('pdf') || m.includes('document') || m.includes('word') || m.includes('text') ||
-      ['pdf','doc','docx','txt','md','xls','xlsx','ppt','pptx','csv'].includes(ext)) return 'documents';
+function getFileCategory(mime, filename = '') {
+  const m = (mime || '').toLowerCase();
+  const ext = (filename.split('.').pop() || '').toLowerCase();
+
+  if (m.startsWith('image/') || ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'ico'].includes(ext)) {
+    return 'images';
+  }
+  if (
+    m.includes('pdf') ||
+    m.includes('word') ||
+    m.includes('officedocument') ||
+    m.includes('text/') ||
+    ['pdf', 'doc', 'docx', 'txt', 'rtf', 'odt', 'csv', 'xlsx', 'pptx'].includes(ext)
+  ) {
+    return 'documents';
+  }
+  if (m.startsWith('video/') || ['mp4', 'mov', 'mkv', 'avi', 'webm'].includes(ext)) {
+    return 'videos';
+  }
+  if (m.startsWith('audio/') || ['mp3', 'wav', 'ogg', 'm4a', 'flac', 'aac'].includes(ext)) {
+    return 'audio';
+  }
+  if (m.includes('zip') || m.includes('compressed') || ['zip', 'rar', '7z', 'tar', 'gz'].includes(ext)) {
+    return 'archives';
+  }
   return 'other';
 }
 
-function getFileIconMeta(mimetype, filename = '') {
-  const cat = getFileCategory(mimetype, filename);
-  const ext = String(filename).split('.').pop().toLowerCase();
-  if (cat === 'images') return { icon: 'fa-regular fa-file-image', color: '#0ea5e9' };
-  if (ext === 'pdf' || (mimetype || '').includes('pdf')) return { icon: 'fa-regular fa-file-pdf', color: '#ef4444' };
-  if (['doc','docx'].includes(ext) || (mimetype || '').includes('word')) return { icon: 'fa-regular fa-file-word', color: '#2563eb' };
-  if (['xls','xlsx','csv'].includes(ext)) return { icon: 'fa-regular fa-file-excel', color: '#16a34a' };
-  if (cat === 'videos') return { icon: 'fa-regular fa-file-video', color: '#8b5cf6' };
-  if (cat === 'audio') return { icon: 'fa-regular fa-file-audio', color: '#f59e0b' };
-  if (cat === 'archives') return { icon: 'fa-regular fa-file-zipper', color: '#d97706' };
-  return { icon: 'fa-regular fa-file-lines', color: '#64748b' };
+function getFileIconMeta(mime, filename = '') {
+  const cat = getFileCategory(mime, filename);
+  switch (cat) {
+    case 'images':
+      return { icon: 'fa-regular fa-file-image', color: '#0ea5e9', label: 'Image' };
+    case 'documents':
+      return { icon: 'fa-regular fa-file-lines', color: '#38bdf8', label: 'Document' };
+    case 'videos':
+      return { icon: 'fa-regular fa-file-video', color: '#6366f1', label: 'Video' };
+    case 'audio':
+      return { icon: 'fa-regular fa-file-audio', color: '#ec4899', label: 'Audio' };
+    case 'archives':
+      return { icon: 'fa-regular fa-file-zipper', color: '#f59e0b', label: 'Archive' };
+    default:
+      return { icon: 'fa-regular fa-file', color: '#94a3b8', label: 'File' };
+  }
 }
 
 // =============================================
-// REALTIME STORAGE UI
+// TERABOX STYLE STORAGE USAGE TRACKER
 // =============================================
 function updateStorageUI(p) {
   if (!p) return;
   profile = p;
   const used = Number(p.usedStorageBytes || p.storageUsed || 0);
-  const limit = Number(p.storageLimitBytes || p.storageLimit || 10 * 1024 ** 3);
+  const limit = Number(p.storageLimitBytes || p.storageLimit || DEFAULT_STORAGE_BYTES);
   const percent = Math.min(100, Math.round((used / limit) * 100));
 
+  // Percentage badge
   if (storagePercentText) storagePercentText.textContent = `${percent}%`;
-  if (storageProgressBar) storageProgressBar.style.width = `${percent}%`;
 
+  // Fallback linear bar
+  if (storageProgressBar) {
+    storageProgressBar.style.width = `${percent}%`;
+    if (percent >= 90) {
+      storageProgressBar.style.background = '#ef4444';
+    } else if (percent >= 75) {
+      storageProgressBar.style.background = '#f59e0b';
+    } else {
+      storageProgressBar.style.background = 'linear-gradient(90deg, #0ea5e9, #38bdf8)';
+    }
+  }
+
+  // Multi-Category Segmented Calculation (TeraBox visual)
+  let photoBytes = 0;
+  let docBytes = 0;
+  let mediaBytes = 0;
+  let audioBytes = 0;
+  let otherBytes = 0;
+
+  allFiles.forEach((file) => {
+    const sz = Number(file.size || 0);
+    const cat = getFileCategory(file.mimetype || file.type, file.name);
+    if (cat === 'images') photoBytes += sz;
+    else if (cat === 'documents') docBytes += sz;
+    else if (cat === 'videos') mediaBytes += sz;
+    else if (cat === 'audio') audioBytes += sz;
+    else otherBytes += sz;
+  });
+
+  const photoPct = limit > 0 ? ((photoBytes / limit) * 100).toFixed(1) : 0;
+  const docPct = limit > 0 ? ((docBytes / limit) * 100).toFixed(1) : 0;
+  const mediaPct = limit > 0 ? ((mediaBytes / limit) * 100).toFixed(1) : 0;
+  const audioPct = limit > 0 ? ((audioBytes / limit) * 100).toFixed(1) : 0;
+  const otherPct = limit > 0 ? ((otherBytes / limit) * 100).toFixed(1) : 0;
+
+  if (segPhotos) segPhotos.style.width = `${photoPct}%`;
+  if (segDocs) segDocs.style.width = `${docPct}%`;
+  if (segMedia) segMedia.style.width = `${mediaPct}%`;
+  if (segAudio) segAudio.style.width = `${audioPct}%`;
+  if (segOther) segOther.style.width = `${otherPct}%`;
+
+  // Quota Warning Banner
   if (percent >= 90) {
-    if (storageProgressBar) storageProgressBar.style.background = '#ef4444';
     if (quotaWarningBanner) {
       quotaWarningBanner.className = 'storage-banner danger';
-      if (quotaWarningText) quotaWarningText.textContent = `Critical: ${percent}% of your drive is full. Upgrade now.`;
+      if (quotaWarningText) quotaWarningText.textContent = `Critical: ${percent}% of your allocated cloud space is full. Upgrade now.`;
       quotaWarningBanner.style.display = 'flex';
     }
   } else if (percent >= 75) {
-    if (storageProgressBar) storageProgressBar.style.background = '#f59e0b';
     if (quotaWarningBanner) {
       quotaWarningBanner.className = 'storage-banner warning';
-      if (quotaWarningText) quotaWarningText.textContent = `Notice: You have used ${percent}% of your allocated drive space.`;
+      if (quotaWarningText) quotaWarningText.textContent = `Notice: You have used ${percent}% of your cloud storage.`;
       quotaWarningBanner.style.display = 'flex';
     }
   } else {
-    if (storageProgressBar) storageProgressBar.style.background = 'linear-gradient(90deg, #0ea5e9, #38bdf8)';
     if (quotaWarningBanner) quotaWarningBanner.style.display = 'none';
   }
 
-  if (storageUsageDetails) storageUsageDetails.innerHTML = `<b>${formatBytes(used)}</b> of ${formatBytes(limit, 0)} used`;
-  const tierName = p.planType || (limit > 10 * 1024 ** 3 ? 'Pro' : 'Free');
-  if (dropdownPlanBadge) dropdownPlanBadge.textContent = `${tierName} · ${formatBytes(limit, 0)}`;
+  if (storageUsageDetails) {
+    storageUsageDetails.innerHTML = `<b>${formatBytes(used)}</b> of ${formatBytes(limit, 0)} used`;
+  }
+
+  const isUserAdmin = isAdmin(p);
+  const tierName = isUserAdmin ? 'Admin' : (p.planType || (limit > 5 * 1024 ** 3 ? 'Pro' : 'Starter'));
+  if (dropdownPlanBadge) {
+    dropdownPlanBadge.textContent = `${tierName} · ${formatBytes(limit, 0)}`;
+    if (isUserAdmin) dropdownPlanBadge.classList.add('admin');
+  }
 }
 
 // =============================================
-// USER IDENTITY UI — Synchronous Placeholder Shield
+// USER IDENTITY UI
 // =============================================
 function setupUserUI(user, prof) {
   const email = prof?.email || user?.email || '';
@@ -228,7 +321,9 @@ function setupUserUI(user, prof) {
 
   // Avatar button
   if (user?.photoURL) {
-    if (userAvatarBtn) userAvatarBtn.innerHTML = `<img src="${user.photoURL}" alt="${displayName}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+    if (userAvatarBtn) {
+      userAvatarBtn.innerHTML = `<img src="${user.photoURL}" alt="${displayName}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+    }
   } else {
     if (userInitials) userInitials.textContent = initial;
   }
@@ -240,9 +335,11 @@ function setupUserUI(user, prof) {
   if (dropdownEmail) dropdownEmail.textContent = email;
   if (dropdownAccountId) dropdownAccountId.textContent = `Account: ${accountId}`;
 
-  // Admin link
-  if (isAdmin(prof) && adminDashboardBtn) {
-    adminDashboardBtn.style.display = 'flex';
+  // Admin badge & Console link
+  if (isAdmin(prof) || email.toLowerCase() === ADMIN_EMAIL) {
+    if (adminDashboardBtn) adminDashboardBtn.style.display = 'flex';
+  } else {
+    if (adminDashboardBtn) adminDashboardBtn.style.display = 'none';
   }
 }
 
@@ -256,7 +353,6 @@ function initAuthLifecycle() {
       return;
     }
 
-    // Instantly bind identity so placeholders never flash
     setupUserUI(user, {
       email: user.email,
       displayName: user.displayName || user.email.split('@')[0],
@@ -275,9 +371,9 @@ function initAuthLifecycle() {
         username: deriveUsername(user),
         accountId: deriveAccountId(user),
         photoURL: user.photoURL || '',
-        storageLimitBytes: 10 * 1024 ** 3,
+        storageLimitBytes: DEFAULT_STORAGE_BYTES,
         usedStorageBytes: 0,
-        planType: 'Free',
+        planType: 'Starter',
         tier: 'free',
         isAdmin: (user.email || '').toLowerCase() === ADMIN_EMAIL
       };
@@ -298,229 +394,331 @@ if (document.readyState === 'complete') {
 // Background storage refresher
 setInterval(async () => {
   try {
-    const updated = await refreshProfile();
-    updateStorageUI(updated);
+    const refreshed = await refreshProfile();
+    if (refreshed) updateStorageUI(refreshed);
   } catch (_) {}
 }, 45000);
 
 // =============================================
-// FILE LOADING & DISPLAY (Direct from Firestore)
+// FIRESTORE FILES DATA LOADER
 // =============================================
 async function loadUserFiles(uid) {
-  const user = getCurrentUser();
-  const targetUid = uid || user?.uid;
-  if (!targetUid) return;
-
+  if (!uid) return;
   try {
-    const snap = await getDocs(collection(db, 'users', targetUid, 'files'));
-    allFiles = snap.docs.map((d) => {
-      const data = d.data();
-      return {
-        id: d.id,
-        name: data.name || data.originalName || 'Untitled',
-        originalName: data.originalName || data.name || 'Untitled',
-        size: Number(data.size || 0),
-        mimetype: data.mimetype || data.type || 'application/octet-stream',
-        mimeType: data.type || data.mimetype || 'application/octet-stream',
-        url: data.url || '',
-        storagePath: data.storagePath || '',
-        isStarred: Boolean(data.isStarred),
-        uploadedAt: data.uploadedAt?.toDate?.()?.toISOString() || data.uploadedAt || new Date().toISOString(),
-        updatedAt: data.updatedAt?.toDate?.()?.toISOString() || data.updatedAt
-      };
+    const filesSnap = await getDocs(collection(db, 'users', uid, 'files'));
+    allFiles = [];
+    filesSnap.forEach((docSnap) => {
+      const d = docSnap.data();
+      let iso = new Date().toISOString();
+      if (d.uploadedAt?.toDate) iso = d.uploadedAt.toDate().toISOString();
+      else if (typeof d.uploadedAt === 'string') iso = d.uploadedAt;
+
+      allFiles.push({
+        id: docSnap.id,
+        name: d.name || d.originalName || 'Untitled File',
+        originalName: d.originalName || d.name || 'Untitled File',
+        size: Number(d.size || 0),
+        type: d.type || d.mimetype || 'application/octet-stream',
+        mimetype: d.mimetype || d.type || 'application/octet-stream',
+        url: d.url || '',
+        storagePath: d.storagePath || '',
+        isStarred: Boolean(d.isStarred),
+        isTrash: Boolean(d.isTrash),
+        uploadedAt: iso
+      });
     });
 
     applyFiltersAndRender();
+    if (profile) updateStorageUI(profile);
   } catch (err) {
-    console.warn('[Zulora] Firestore direct load notice:', err.message);
-    allFiles = [];
-    applyFiltersAndRender();
+    console.error('[Zulora Files] loadUserFiles notice:', err.message);
   }
 }
 
+// =============================================
+// FILTERING, SORTING & RENDERING
+// =============================================
 function applyFiltersAndRender() {
   const query = (globalSearchInput?.value || '').trim().toLowerCase();
 
   filteredFiles = allFiles.filter((file) => {
-    const fileName = file.originalName || file.name || '';
+    // Trash filter
+    if (currentNav === 'trash') {
+      if (!file.isTrash) return false;
+    } else {
+      if (file.isTrash) return false;
+    }
+
+    // Navigation filters
     if (currentNav === 'starred' && !file.isStarred) return false;
-    if (currentCategory !== 'all' && getFileCategory(file.mimetype || file.mimeType, fileName) !== currentCategory) return false;
-    if (query && !fileName.toLowerCase().includes(query)) return false;
+
+    // Category filter
+    if (currentCategory !== 'all') {
+      const cat = getFileCategory(file.mimetype || file.type, file.name);
+      if (cat !== currentCategory) return false;
+    }
+
+    // Search query filter
+    if (query) {
+      const matchName = (file.name || '').toLowerCase().includes(query);
+      const matchType = (file.type || '').toLowerCase().includes(query);
+      if (!matchName && !matchType) return false;
+    }
+
     return true;
   });
 
+  // Sorting
   filteredFiles.sort((a, b) => {
-    const aName = a.originalName || a.name || '';
-    const bName = b.originalName || b.name || '';
-    const aDate = new Date(a.uploadedAt || 0);
-    const bDate = new Date(b.uploadedAt || 0);
-    if (currentSort === 'date-desc') return bDate - aDate;
-    if (currentSort === 'date-asc') return aDate - bDate;
-    if (currentSort === 'name-asc') return aName.localeCompare(bName);
-    if (currentSort === 'size-desc') return (b.size || 0) - (a.size || 0);
-    return 0;
+    switch (currentSort) {
+      case 'date-asc':
+        return new Date(a.uploadedAt) - new Date(b.uploadedAt);
+      case 'name-asc':
+        return (a.name || '').localeCompare(b.name || '');
+      case 'name-desc':
+        return (b.name || '').localeCompare(a.name || '');
+      case 'size-desc':
+        return (b.size || 0) - (a.size || 0);
+      case 'size-asc':
+        return (a.size || 0) - (b.size || 0);
+      case 'date-desc':
+      default:
+        return new Date(b.uploadedAt) - new Date(a.uploadedAt);
+    }
   });
 
-  renderFiles();
+  // Update counter
+  if (fileCountBadge) fileCountBadge.textContent = `${filteredFiles.length} file${filteredFiles.length === 1 ? '' : 's'}`;
+
+  renderFilesView();
 }
 
-function renderFiles() {
-  if (filteredFiles.length === 0) {
-    if (filesGrid) filesGrid.style.display = 'none';
-    if (filesListContainer) filesListContainer.style.display = 'none';
-    if (emptyState) emptyState.style.display = 'flex';
+function renderFilesView() {
+  const hasFiles = filteredFiles.length > 0;
+
+  if (emptyState) emptyState.style.display = hasFiles ? 'none' : 'flex';
+  if (filesGrid) filesGrid.style.display = hasFiles && currentViewMode === 'grid' ? 'grid' : 'none';
+  if (filesListContainer) filesListContainer.style.display = hasFiles && currentViewMode === 'list' ? 'block' : 'none';
+
+  if (!hasFiles) {
+    if (filesGrid) filesGrid.innerHTML = '';
+    if (filesTableBody) filesTableBody.innerHTML = '';
     return;
   }
-  if (emptyState) emptyState.style.display = 'none';
 
   if (currentViewMode === 'grid') {
-    if (filesListContainer) filesListContainer.style.display = 'none';
-    if (filesGrid) { filesGrid.style.display = 'grid'; renderGridView(); }
+    renderGridView();
   } else {
-    if (filesGrid) filesGrid.style.display = 'none';
-    if (filesListContainer) { filesListContainer.style.display = 'block'; renderListView(); }
+    renderListView();
   }
 }
 
+// Render TeraBox Style Grid Cards
 function renderGridView() {
   if (!filesGrid) return;
   filesGrid.innerHTML = '';
+
   filteredFiles.forEach((file) => {
-    const name = file.originalName || file.name || 'Untitled';
-    const meta = getFileIconMeta(file.mimetype || file.mimeType, name);
+    const meta = getFileIconMeta(file.mimetype || file.type, file.name);
+    const isImg = getFileCategory(file.mimetype || file.type, file.name) === 'images';
+
     const card = document.createElement('div');
     card.className = 'file-card';
-    card.dataset.id = file.id;
+    card.dataset.fileId = file.id;
+
     card.innerHTML = `
-      <div class="file-card-top">
-        <div class="file-card-icon" style="color:${meta.color}"><i class="${meta.icon}"></i></div>
-        <div class="file-card-actions">
-          <button class="star-btn ${file.isStarred ? 'starred' : ''}" type="button" data-action="toggle-star">
+      <div class="file-card-preview-box">
+        ${
+          isImg && file.url
+            ? `<img src="${file.url}" alt="${file.name}" class="file-card-thumb" loading="lazy">`
+            : `<i class="${meta.icon} file-card-icon-large" style="color: ${meta.color};"></i>`
+        }
+      </div>
+      <div class="file-card-actions">
+        <span class="file-card-type-tag">${meta.label}</span>
+        <div class="file-card-buttons">
+          <button class="star-btn ${file.isStarred ? 'starred' : ''}" data-action="toggle-star" title="${file.isStarred ? 'Unstar' : 'Star'}">
             <i class="${file.isStarred ? 'fa-solid' : 'fa-regular'} fa-star"></i>
           </button>
-          <button class="menu-btn" type="button" data-action="open-menu">
+          <button class="menu-btn" data-action="open-menu" title="More options">
             <i class="fa-solid fa-ellipsis-vertical"></i>
           </button>
         </div>
       </div>
       <div class="file-card-info">
-        <div class="file-card-title" title="${name}" data-action="preview">${name}</div>
+        <div class="file-card-title" title="${file.name}">${file.name}</div>
         <div class="file-card-meta">
           <span>${formatBytes(file.size)}</span>
           <span>${formatDate(file.uploadedAt)}</span>
         </div>
-      </div>`;
+      </div>
+    `;
+
+    // Click to preview
     card.addEventListener('click', (e) => {
-      const btn = e.target.closest('[data-action]');
-      if (!btn) return;
-      const action = btn.dataset.action;
-      if (action === 'toggle-star') { e.stopPropagation(); toggleStar(file); }
-      else if (action === 'open-menu') { e.stopPropagation(); showContextMenu(e, file); }
-      else if (action === 'preview') openPreviewModal(file);
+      if (e.target.closest('button')) return;
+      openPreviewModal(file);
     });
-    card.addEventListener('dblclick', () => openPreviewModal(file));
+
+    // Star button
+    const starBtn = card.querySelector('[data-action="toggle-star"]');
+    starBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleStar(file);
+    });
+
+    // Context menu trigger
+    const menuBtn = card.querySelector('[data-action="open-menu"]');
+    menuBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      showContextMenu(e, file);
+    });
+
     filesGrid.appendChild(card);
   });
 }
 
+// Render Google Drive Style List Table
 function renderListView() {
   if (!filesTableBody) return;
   filesTableBody.innerHTML = '';
+
   filteredFiles.forEach((file) => {
-    const name = file.originalName || file.name || 'Untitled';
-    const meta = getFileIconMeta(file.mimetype || file.mimeType, name);
+    const meta = getFileIconMeta(file.mimetype || file.type, file.name);
     const tr = document.createElement('tr');
-    tr.dataset.id = file.id;
+    tr.dataset.fileId = file.id;
+
     tr.innerHTML = `
       <td>
         <div class="table-name-cell">
-          <div class="table-file-icon" style="color:${meta.color}"><i class="${meta.icon}"></i></div>
-          <span class="table-file-name" data-action="preview">${name}</span>
+          <i class="${meta.icon} table-file-icon" style="color: ${meta.color};"></i>
+          <span title="${file.name}">${file.name}</span>
         </div>
       </td>
-      <td style="color:var(--text-muted);font-size:0.85rem;">${formatBytes(file.size)}</td>
-      <td style="color:var(--text-muted);font-size:0.85rem;">${formatDate(file.uploadedAt)}</td>
-      <td style="text-align:right;">
-        <button class="btn-icon star-btn ${file.isStarred ? 'starred' : ''}" type="button" data-action="toggle-star" title="Star">
-          <i class="${file.isStarred ? 'fa-solid' : 'fa-regular'} fa-star"></i>
-        </button>
-        <button class="btn-icon" type="button" data-action="download" title="Download">
-          <i class="fa-solid fa-download"></i>
-        </button>
-        <button class="btn-icon" type="button" data-action="open-menu" title="More">
-          <i class="fa-solid fa-ellipsis-vertical"></i>
-        </button>
-      </td>`;
+      <td>${formatBytes(file.size)}</td>
+      <td>${formatDate(file.uploadedAt)}</td>
+      <td>
+        <div class="table-actions">
+          <button class="star-btn ${file.isStarred ? 'starred' : ''}" data-action="toggle-star" title="Star">
+            <i class="${file.isStarred ? 'fa-solid' : 'fa-regular'} fa-star"></i>
+          </button>
+          <button class="btn-icon" data-action="preview" title="Preview">
+            <i class="fa-regular fa-eye"></i>
+          </button>
+          <button class="btn-icon" data-action="download" title="Download">
+            <i class="fa-solid fa-download"></i>
+          </button>
+          <button class="menu-btn" data-action="open-menu" title="More options">
+            <i class="fa-solid fa-ellipsis-vertical"></i>
+          </button>
+        </div>
+      </td>
+    `;
+
     tr.addEventListener('click', (e) => {
-      const btn = e.target.closest('[data-action]');
-      if (!btn) return;
-      const action = btn.dataset.action;
-      if (action === 'toggle-star') { e.stopPropagation(); toggleStar(file); }
-      else if (action === 'download') { e.stopPropagation(); downloadFile(file); }
-      else if (action === 'open-menu') { e.stopPropagation(); showContextMenu(e, file); }
-      else if (action === 'preview') openPreviewModal(file);
+      if (e.target.closest('button')) return;
+      openPreviewModal(file);
     });
+
+    tr.querySelector('[data-action="toggle-star"]')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleStar(file);
+    });
+
+    tr.querySelector('[data-action="preview"]')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openPreviewModal(file);
+    });
+
+    tr.querySelector('[data-action="download"]')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      downloadFile(file);
+    });
+
+    tr.querySelector('[data-action="open-menu"]')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      showContextMenu(e, file);
+    });
+
     filesTableBody.appendChild(tr);
   });
 }
 
 // =============================================
-// FILE ACTIONS (Preview, Download, Star, Delete)
+// FILE ACTIONS (Preview, Download, Star, Rename, Delete)
 // =============================================
-async function toggleStar(file) {
-  file.isStarred = !file.isStarred;
-  renderFiles();
-  const user = getCurrentUser();
-  if (user) {
-    try {
-      await updateDoc(doc(db, 'users', user.uid, 'files', file.id), {
-        isStarred: file.isStarred,
-        updatedAt: serverTimestamp()
-      });
-    } catch (err) {
-      console.warn('Star toggle error:', err.message);
-    }
-  }
-}
-
-function downloadFile(file) {
-  if (file.url) {
-    window.open(file.url, '_blank');
-  }
-}
-
 function openPreviewModal(file) {
   selectedFile = file;
-  const name = file.originalName || file.name || 'File';
-  const url = file.url || '';
+  const name = file.originalName || file.name || 'File Preview';
+  const url = file.url;
 
   if (previewTitle) previewTitle.textContent = name;
   if (previewDownloadBtn) {
     previewDownloadBtn.href = url;
     previewDownloadBtn.download = name;
   }
-  if (previewContainer) previewContainer.innerHTML = '<div style="color:var(--text-muted);"><i class="fa-solid fa-circle-notch fa-spin"></i> Loading preview...</div>';
+  if (previewContainer) {
+    previewContainer.innerHTML = '<div style="color:var(--text-muted);"><i class="fa-solid fa-circle-notch fa-spin"></i> Loading file preview...</div>';
+  }
   if (previewModal) previewModal.classList.add('show');
 
-  const cat = getFileCategory(file.mimetype || file.mimeType, name);
+  const cat = getFileCategory(file.mimetype || file.type, name);
+
   if (cat === 'images') {
-    previewContainer.innerHTML = `<img src="${url}" alt="${name}" style="max-width:100%;max-height:55vh;object-fit:contain;">`;
+    previewContainer.innerHTML = `<img src="${url}" alt="${name}" style="max-width:100%;max-height:55vh;object-fit:contain;border-radius:8px;">`;
   } else if (cat === 'videos') {
-    previewContainer.innerHTML = `<video controls autoplay style="max-width:100%;max-height:55vh;"><source src="${url}" type="${file.mimetype || 'video/mp4'}">Preview not supported.</video>`;
+    previewContainer.innerHTML = `<video controls autoplay style="max-width:100%;max-height:55vh;border-radius:8px;"><source src="${url}" type="${file.mimetype || 'video/mp4'}">Preview not supported.</video>`;
   } else if (cat === 'audio') {
-    previewContainer.innerHTML = `<audio controls autoplay style="width:80%;"><source src="${url}" type="${file.mimetype || 'audio/mpeg'}">Preview not supported.</audio>`;
+    previewContainer.innerHTML = `<audio controls autoplay style="width:85%;"><source src="${url}" type="${file.mimetype || 'audio/mpeg'}">Audio preview not supported.</audio>`;
   } else if (name.endsWith('.pdf') || (file.mimetype || '').includes('pdf')) {
-    previewContainer.innerHTML = `<iframe src="${url}" style="width:100%;height:55vh;border:none;"></iframe>`;
+    previewContainer.innerHTML = `<iframe src="${url}" style="width:100%;height:55vh;border:none;border-radius:8px;"></iframe>`;
   } else {
-    fetch(url).then((r) => r.headers.get('content-type')?.includes('text') ? r.text() : null)
+    fetch(url)
+      .then((r) => (r.headers.get('content-type')?.includes('text') ? r.text() : null))
       .then((text) => {
         if (typeof text === 'string') {
-          previewContainer.innerHTML = `<pre style="width:100%;height:50vh;overflow:auto;padding:14px;background:#fff;border:1px solid var(--border-soft);border-radius:8px;font-family:var(--font-mono);font-size:0.85rem;text-align:left;">${text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</pre>`;
+          previewContainer.innerHTML = `<pre style="width:100%;height:50vh;overflow:auto;padding:14px;background:#ffffff;border:1px solid var(--border-soft);border-radius:8px;font-family:var(--font-mono);font-size:0.85rem;text-align:left;">${text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre>`;
         } else {
-          const m = getFileIconMeta(file.mimetype || file.mimeType, name);
-          previewContainer.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;gap:12px;"><i class="${m.icon}" style="font-size:4rem;color:${m.color}"></i><div style="font-weight:600;">${name}</div><div style="font-size:0.85rem;color:var(--text-muted);">${formatBytes(file.size)}</div></div>`;
+          const m = getFileIconMeta(file.mimetype || file.type, name);
+          previewContainer.innerHTML = `
+            <div style="display:flex;flex-direction:column;align-items:center;gap:12px;">
+              <i class="${m.icon}" style="font-size:4.5rem;color:${m.color}"></i>
+              <div style="font-weight:700;font-size:1rem;">${name}</div>
+              <div style="font-size:0.85rem;color:var(--text-muted);">${formatBytes(file.size)}</div>
+            </div>`;
         }
-      }).catch(() => { previewContainer.innerHTML = '<div>Cannot preview. Please download to view.</div>'; });
+      })
+      .catch(() => {
+        previewContainer.innerHTML = '<div>Preview unavailable for this format. Please download to view.</div>';
+      });
+  }
+}
+
+function downloadFile(file) {
+  if (!file?.url) return;
+  const a = document.createElement('a');
+  a.href = file.url;
+  a.download = file.name || 'download';
+  a.target = '_blank';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+async function toggleStar(file) {
+  const user = getCurrentUser();
+  if (!user || !file) return;
+  const newStarred = !file.isStarred;
+  file.isStarred = newStarred;
+  applyFiltersAndRender();
+
+  try {
+    await updateDoc(doc(db, 'users', user.uid, 'files', file.id), {
+      isStarred: newStarred,
+      updatedAt: serverTimestamp()
+    });
+  } catch (err) {
+    console.warn('[Zulora] toggleStar notice:', err.message);
   }
 }
 
@@ -528,7 +726,10 @@ function openRenameModal(file) {
   selectedFile = file;
   const name = file.originalName || file.name || '';
   if (renameInput) renameInput.value = name;
-  if (renameModal) { renameModal.classList.add('show'); renameInput.focus(); }
+  if (renameModal) {
+    renameModal.classList.add('show');
+    renameInput?.focus();
+  }
 }
 
 if (renameForm) {
@@ -538,6 +739,7 @@ if (renameForm) {
     const newName = renameInput?.value.trim();
     if (!newName) return;
     const user = getCurrentUser();
+
     try {
       if (user) {
         await updateDoc(doc(db, 'users', user.uid, 'files', selectedFile.id), {
@@ -546,7 +748,7 @@ if (renameForm) {
           updatedAt: serverTimestamp()
         });
       }
-      renameModal.classList.remove('show');
+      renameModal?.classList.remove('show');
       await loadUserFiles(user?.uid);
     } catch (err) {
       alert(err.message || 'Failed to rename file.');
@@ -558,7 +760,9 @@ function openDeleteModal(file) {
   selectedFile = file;
   const name = file.originalName || file.name || 'this file';
   const prompt = document.getElementById('deletePromptText');
-  if (prompt) prompt.textContent = `Delete "${name}" permanently? This cannot be undone and your storage quota will be reclaimed immediately.`;
+  if (prompt) {
+    prompt.textContent = `Delete "${name}" permanently? This cannot be undone and your storage quota will be reclaimed immediately.`;
+  }
   if (deleteModal) deleteModal.classList.add('show');
 }
 
@@ -570,30 +774,26 @@ if (confirmDeleteBtn) {
     const user = getCurrentUser();
 
     try {
-      // 1. Delete from Firebase Storage if storagePath exists
+      // 1. Delete from Cloud Storage
       if (selectedFile.storagePath) {
         try {
           await deleteObject(storageRef(storage, selectedFile.storagePath));
         } catch (storErr) {
-          console.warn('[Zulora] Storage file delete notice:', storErr.message);
+          console.warn('[Zulora Storage] Delete object notice:', storErr.message);
         }
       }
 
       // 2. Delete from Firestore users/{uid}/files/{fileId}
       if (user) {
-        try {
-          await deleteDoc(doc(db, 'users', user.uid, 'files', selectedFile.id));
-          await updateDoc(doc(db, 'users', user.uid), {
-            usedStorageBytes: increment(-Number(selectedFile.size || 0)),
-            storageUsed: increment(-Number(selectedFile.size || 0)),
-            updatedAt: serverTimestamp()
-          }).catch(() => {});
-        } catch (fsErr) {
-          console.warn('[Zulora] Firestore doc delete notice:', fsErr.message);
-        }
+        await deleteDoc(doc(db, 'users', user.uid, 'files', selectedFile.id));
+        await updateDoc(doc(db, 'users', user.uid), {
+          usedStorageBytes: increment(-Number(selectedFile.size || 0)),
+          storageUsed: increment(-Number(selectedFile.size || 0)),
+          updatedAt: serverTimestamp()
+        }).catch(() => {});
       }
 
-      if (deleteModal) deleteModal.classList.remove('show');
+      deleteModal?.classList.remove('show');
       const updated = await refreshProfile().catch(() => null);
       if (updated) updateStorageUI(updated);
       await loadUserFiles(user?.uid);
@@ -601,18 +801,18 @@ if (confirmDeleteBtn) {
       alert(err.message || 'Failed to delete file.');
     } finally {
       confirmDeleteBtn.disabled = false;
-      confirmDeleteBtn.innerHTML = '<i class="fa-regular fa-trash-can"></i> Delete Permanently';
+      confirmDeleteBtn.innerHTML = 'Delete File';
     }
   });
 }
 
-// Context Menu
+// Context Menu Control
 function showContextMenu(e, file) {
   selectedFile = file;
   if (!fileContextMenu) return;
   const rect = e.target.getBoundingClientRect();
   fileContextMenu.style.top = `${rect.bottom + window.scrollY + 4}px`;
-  fileContextMenu.style.left = `${Math.min(window.innerWidth - 190, rect.left + window.scrollX - 80)}px`;
+  fileContextMenu.style.left = `${Math.min(window.innerWidth - 200, rect.left + window.scrollX - 80)}px`;
   fileContextMenu.classList.add('show');
 }
 
@@ -627,7 +827,7 @@ document.addEventListener('click', (e) => {
 
 if (fileContextMenu) {
   fileContextMenu.addEventListener('click', (e) => {
-    const item = e.target.closest('.context-menu-item');
+    const item = e.target.closest('.context-item');
     if (!item || !selectedFile) return;
     fileContextMenu.classList.remove('show');
     const action = item.dataset.action;
@@ -640,7 +840,7 @@ if (fileContextMenu) {
 }
 
 // =============================================
-// FILE UPLOADS — DIRECT CLIENT-SIDE FIREBASE STORAGE SDK
+// DIRECT CLIENT-SIDE FIREBASE STORAGE UPLOADS
 // =============================================
 if (newUploadBtn) newUploadBtn.addEventListener('click', () => fileUploadInput?.click());
 if (emptyUploadBtn) emptyUploadBtn.addEventListener('click', () => fileUploadInput?.click());
@@ -653,14 +853,28 @@ if (fileUploadInput) {
   });
 }
 
-// Fullscreen workspace drag & drop
+// Fullscreen Workspace Drag & Drop
 let dragCounter = 0;
 if (mainWorkspace) {
   ['dragenter', 'dragover', 'dragleave', 'drop'].forEach((event) => {
-    mainWorkspace.addEventListener(event, (e) => { e.preventDefault(); e.stopPropagation(); });
+    mainWorkspace.addEventListener(event, (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+    });
   });
-  mainWorkspace.addEventListener('dragenter', () => { dragCounter++; dropzoneOverlay?.classList.add('active'); });
-  mainWorkspace.addEventListener('dragleave', () => { if (--dragCounter <= 0) { dragCounter = 0; dropzoneOverlay?.classList.remove('active'); } });
+
+  mainWorkspace.addEventListener('dragenter', () => {
+    dragCounter++;
+    dropzoneOverlay?.classList.add('active');
+  });
+
+  mainWorkspace.addEventListener('dragleave', () => {
+    if (--dragCounter <= 0) {
+      dragCounter = 0;
+      dropzoneOverlay?.classList.remove('active');
+    }
+  });
+
   mainWorkspace.addEventListener('drop', (e) => {
     dragCounter = 0;
     dropzoneOverlay?.classList.remove('active');
@@ -670,8 +884,8 @@ if (mainWorkspace) {
 }
 
 /**
- * Direct Firebase Storage Upload Pipeline
- * Eliminates all 404 errors by streaming straight to Google Cloud Firebase Storage!
+ * Direct Client-Side Storage Upload Pipeline
+ * Checks 500 MB single file limit for Starter users
  */
 async function uploadFilesBatch(files) {
   const user = getCurrentUser();
@@ -681,17 +895,27 @@ async function uploadFilesBatch(files) {
   }
 
   if (!uploadDrawer) return;
+  uploadDrawer.style.display = 'block';
   uploadDrawer.classList.add('show');
-  if (uploadDrawerStatus) uploadDrawerStatus.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin text-azure"></i> Uploading to Firebase Storage...';
+  if (uploadDrawerStatus) {
+    uploadDrawerStatus.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin text-azure"></i> Uploading to Firebase Storage...';
+  }
   if (uploadDrawerBody) uploadDrawerBody.innerHTML = '';
 
   for (const file of files) {
-    // Check storage quota client-side
+    const limit = Number(profile?.storageLimitBytes || profile?.storageLimit || DEFAULT_STORAGE_BYTES);
     const used = Number(profile?.usedStorageBytes || profile?.storageUsed || 0);
-    const limit = Number(profile?.storageLimitBytes || profile?.storageLimit || 10 * 1024 ** 3);
 
+    // Check single file size limit for Free Starter plan (500 MB max)
+    if (limit <= DEFAULT_STORAGE_BYTES && file.size > MAX_STARTER_FILE_BYTES) {
+      alert(`Single file limit exceeded: Free Starter plan allows maximum 500 MB per file. "${file.name}" is ${formatBytes(file.size)}. Please upgrade to Storage Lite or Business Pro for unlimited file sizes.`);
+      openPlansModal();
+      continue;
+    }
+
+    // Check storage quota client-side
     if (used + file.size > limit) {
-      alert(`Storage quota exceeded: "${file.name}" requires ${formatBytes(file.size)}, but your drive has only ${formatBytes(Math.max(0, limit - used))} remaining. Upgrade to continue.`);
+      alert(`Storage quota exceeded: "${file.name}" requires ${formatBytes(file.size)}, but your drive has only ${formatBytes(Math.max(0, limit - used))} remaining. Upgrade your plan to continue.`);
       openPlansModal();
       continue;
     }
@@ -701,7 +925,7 @@ async function uploadFilesBatch(files) {
     row.innerHTML = `
       <div class="upload-item-info">
         <span class="upload-item-name" title="${file.name}">${file.name}</span>
-        <span class="upload-status-text" style="font-size:0.78rem;color:var(--azure-primary);">0%</span>
+        <span class="upload-status-text" style="font-size:0.78rem;font-weight:600;color:var(--azure-primary);">0%</span>
       </div>
       <div class="upload-item-progress-track">
         <div class="upload-item-progress-bar"></div>
@@ -712,23 +936,25 @@ async function uploadFilesBatch(files) {
     const status = row.querySelector('.upload-status-text');
 
     try {
-      // Direct Firebase Storage SDK upload — 100% bypasses local server/Vercel
       await uploadFileToFirebaseStorage(file, (progress) => {
         if (bar) bar.style.width = `${progress}%`;
         if (status) status.textContent = `${progress}%`;
       });
 
-      if (status) status.innerHTML = '<i class="fa-solid fa-circle-check" style="color:#10b981;"></i>';
+      if (status) status.innerHTML = '<i class="fa-solid fa-circle-check" style="color:#10b981;"></i> Done';
       if (bar) bar.style.background = '#10b981';
     } catch (err) {
       console.error('Upload failure:', err);
-      if (status) status.innerHTML = '<i class="fa-solid fa-circle-xmark" style="color:#ef4444;"></i>';
+      if (status) status.innerHTML = '<i class="fa-solid fa-circle-xmark" style="color:#ef4444;"></i> Failed';
       if (bar) bar.style.background = '#ef4444';
       alert(`Failed to upload "${file.name}": ${err.message}`);
     }
   }
 
-  if (uploadDrawerStatus) uploadDrawerStatus.innerHTML = '<i class="fa-solid fa-check" style="color:#10b981;"></i> All uploads finished';
+  if (uploadDrawerStatus) {
+    uploadDrawerStatus.innerHTML = '<i class="fa-solid fa-check" style="color:#10b981;"></i> Uploads finished';
+  }
+
   try {
     const updated = await refreshProfile();
     updateStorageUI(updated);
@@ -737,11 +963,14 @@ async function uploadFilesBatch(files) {
 }
 
 if (closeUploadDrawerBtn) {
-  closeUploadDrawerBtn.addEventListener('click', () => uploadDrawer?.classList.remove('show'));
+  closeUploadDrawerBtn.addEventListener('click', () => {
+    uploadDrawer?.classList.remove('show');
+    setTimeout(() => { if (uploadDrawer) uploadDrawer.style.display = 'none'; }, 200);
+  });
 }
 
 // =============================================
-// SEARCH, FILTER, SORT & VIEW
+// SEARCH, FILTER CHIPS, SORT & VIEW SWITCHER
 // =============================================
 if (globalSearchInput) {
   globalSearchInput.addEventListener('input', () => {
@@ -749,104 +978,176 @@ if (globalSearchInput) {
     applyFiltersAndRender();
   });
 }
+
 if (searchClearBtn) {
   searchClearBtn.addEventListener('click', () => {
-    if (globalSearchInput) globalSearchInput.value = '';
+    globalSearchInput.value = '';
     searchClearBtn.style.display = 'none';
     applyFiltersAndRender();
-  });
-}
-if (sortBySelect) {
-  sortBySelect.addEventListener('change', (e) => { currentSort = e.target.value; applyFiltersAndRender(); });
-}
-if (viewGridBtn) {
-  viewGridBtn.addEventListener('click', () => {
-    currentViewMode = 'grid';
-    localStorage.setItem('zulora_view_mode', 'grid');
-    viewGridBtn.classList.add('active');
-    viewListBtn?.classList.remove('active');
-    renderFiles();
-  });
-}
-if (viewListBtn) {
-  viewListBtn.addEventListener('click', () => {
-    currentViewMode = 'list';
-    localStorage.setItem('zulora_view_mode', 'list');
-    viewListBtn.classList.add('active');
-    viewGridBtn?.classList.remove('active');
-    renderFiles();
+    globalSearchInput.focus();
   });
 }
 
-document.querySelectorAll('.pill-btn').forEach((btn) => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.pill-btn').forEach((b) => b.classList.remove('active'));
-    btn.classList.add('active');
-    currentCategory = btn.dataset.filter;
+// Google Drive Filter Chips
+document.querySelectorAll('.filter-chip').forEach((chip) => {
+  chip.addEventListener('click', () => {
+    document.querySelectorAll('.filter-chip').forEach((c) => c.classList.remove('active'));
+    chip.classList.add('active');
+    currentCategory = chip.dataset.filter;
     applyFiltersAndRender();
   });
 });
 
-document.querySelectorAll('.nav-item').forEach((btn) => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.nav-item').forEach((b) => b.classList.remove('active'));
-    btn.classList.add('active');
-    currentNav = btn.dataset.nav;
-    if (currentViewTitle) {
-      const titles = { 'my-drive': 'My Drive', 'starred': 'Starred Files', 'recent': 'Recent Files' };
-      currentViewTitle.textContent = titles[currentNav] || 'My Drive';
+// Sidebar Navigation Items
+document.querySelectorAll('.sidebar-nav .nav-item').forEach((item) => {
+  item.addEventListener('click', () => {
+    if (item.hasAttribute('data-open-referral')) return;
+    document.querySelectorAll('.sidebar-nav .nav-item').forEach((i) => i.classList.remove('active'));
+    item.classList.add('active');
+
+    if (item.dataset.nav) {
+      currentNav = item.dataset.nav;
+      currentCategory = 'all';
+      // Sync filter chip
+      document.querySelectorAll('.filter-chip').forEach((c) => c.classList.remove('active'));
+      document.querySelector('.filter-chip[data-filter="all"]')?.classList.add('active');
+      if (currentViewTitle) {
+        currentViewTitle.textContent = item.querySelector('span')?.textContent || 'My Drive';
+      }
+    } else if (item.dataset.category) {
+      currentNav = 'my-drive';
+      currentCategory = item.dataset.category;
+      // Sync filter chip
+      document.querySelectorAll('.filter-chip').forEach((c) => c.classList.remove('active'));
+      document.querySelector(`.filter-chip[data-filter="${currentCategory}"]`)?.classList.add('active');
+      if (currentViewTitle) {
+        currentViewTitle.textContent = item.querySelector('span')?.textContent || 'My Drive';
+      }
     }
+
     applyFiltersAndRender();
-    if (window.innerWidth <= 992) appSidebar?.classList.remove('open');
+
+    // Close mobile sidebar if open
+    if (window.innerWidth <= 900) {
+      appSidebar?.classList.remove('open');
+    }
   });
 });
 
-if (mobileMenuBtn) mobileMenuBtn.addEventListener('click', () => appSidebar?.classList.toggle('open'));
+// Sort Selector
+if (sortBySelect) {
+  sortBySelect.addEventListener('change', () => {
+    currentSort = sortBySelect.value;
+    applyFiltersAndRender();
+  });
+}
+
+// View Toggle Switcher (Grid vs List)
+function setViewMode(mode) {
+  currentViewMode = mode;
+  localStorage.setItem('zulora_view_mode', mode);
+
+  if (mode === 'grid') {
+    viewGridBtn?.classList.add('active');
+    viewListBtn?.classList.remove('active');
+  } else {
+    viewListBtn?.classList.add('active');
+    viewGridBtn?.classList.remove('active');
+  }
+
+  renderFilesView();
+}
+
+if (viewGridBtn) viewGridBtn.addEventListener('click', () => setViewMode('grid'));
+if (viewListBtn) viewListBtn.addEventListener('click', () => setViewMode('list'));
+
+// Set initial view state
+setViewMode(currentViewMode);
+
+// Mobile Sidebar Hamburger Toggle
+if (mobileMenuBtn) {
+  mobileMenuBtn.addEventListener('click', () => {
+    appSidebar?.classList.toggle('open');
+  });
+}
+
+// User Avatar Dropdown
 if (userAvatarBtn) {
-  userAvatarBtn.addEventListener('click', (e) => { e.stopPropagation(); userDropdown?.classList.toggle('show'); });
+  userAvatarBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    userDropdown?.classList.toggle('show');
+  });
 }
+
+// Sign Out
 if (logoutBtn) {
-  logoutBtn.addEventListener('click', async () => { await logOut(); window.location.replace('login.html'); });
+  logoutBtn.addEventListener('click', async () => {
+    try {
+      await logOut();
+      window.location.replace('login.html');
+    } catch (err) {
+      alert(err.message || 'Logout failed.');
+    }
+  });
 }
 
 // =============================================
-// STORAGE UPGRADE & UPI PAYMENT (Direct Firestore)
+// STORAGE PLANS & UPI PAYMENT FLOW
 // =============================================
-function openPlansModal() { plansModal?.classList.add('show'); }
+function openPlansModal() {
+  plansModal?.classList.add('show');
+}
 
-[openPlansModalBtn, sidebarUpgradeBtn, bannerUpgradeBtn, dropdownUpgradeBtn].forEach((btn) => {
+[openPlansModalBtn, headerUpgradeBtn, sidebarUpgradeBtn, bannerUpgradeBtn, dropdownUpgradeBtn].forEach((btn) => {
   if (btn) btn.addEventListener('click', openPlansModal);
 });
 
+// Select Plan Buttons in Pricing Modal
 document.querySelectorAll('.select-plan-btn').forEach((btn) => {
-  btn.addEventListener('click', () => openUpiPayment(btn.dataset.plan, btn.dataset.name, btn.dataset.amount));
+  btn.addEventListener('click', () => {
+    const planKey = btn.dataset.plan;
+    const planName = btn.dataset.name;
+    const amount = btn.dataset.amount;
+    openUpiPayment(planKey, planName, amount);
+  });
 });
 
 function openUpiPayment(planKey, planName, amount) {
   activePlan = { key: planKey, name: planName, amount };
   plansModal?.classList.remove('show');
+
   if (upiModalPlanTitle) upiModalPlanTitle.textContent = `Upgrade to ${planName}`;
   if (upiModalAmountText) upiModalAmountText.textContent = `Pay: ₹${amount} / month`;
 
   const upiUrl = `upi://pay?pa=${SUPPORT_UPI_ID}&pn=Zulora%20Drive&am=${amount}&cu=INR&tn=Zulora%20Drive%20${encodeURIComponent(planName)}`;
   if (payUpiDeepLink) payUpiDeepLink.href = upiUrl;
-  if (upiQrCodeImg) upiQrCodeImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(upiUrl)}`;
+  if (upiQrCodeImg) {
+    upiQrCodeImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(upiUrl)}`;
+  }
 
-  const waLink = document.getElementById('whatsappHelpLink');
-  if (waLink) waLink.href = `${SUPPORT_WHATSAPP.split('?')[0]}?text=Hi%20Zulora%20Support%2C%20I%20have%20paid%20%E2%82%B9${amount}%20for%20${encodeURIComponent(planName)}.`;
+  // Exact WhatsApp Link specified:
+  // https://wa.me/916395211325?text=Hello%20Zulora%20Support,%20I%20have%20paid%20for%20[PlanName]%20via%20UPI.
+  if (whatsappVerifyBtn) {
+    const waText = `Hello Zulora Support, I have paid for ${planName} via UPI.`;
+    whatsappVerifyBtn.href = `https://wa.me/916395211325?text=${encodeURIComponent(waText)}`;
+  }
 
   if (utrInput) utrInput.value = '';
   upiModal?.classList.add('show');
 }
 
+// Copy UPI ID
 if (copyUpiBtn) {
   copyUpiBtn.addEventListener('click', () => {
     navigator.clipboard.writeText(SUPPORT_UPI_ID);
     copyUpiBtn.innerHTML = '<i class="fa-solid fa-check"></i> Copied!';
-    setTimeout(() => { copyUpiBtn.innerHTML = '<i class="fa-regular fa-copy"></i> Copy'; }, 2000);
+    setTimeout(() => {
+      copyUpiBtn.innerHTML = '<i class="fa-regular fa-copy"></i> Copy UPI ID';
+    }, 2000);
   });
 }
 
+// UTR Form Submission
 if (upiConfirmForm) {
   upiConfirmForm.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -855,10 +1156,12 @@ if (upiConfirmForm) {
     if (!utr || !activePlan || !user) return;
 
     const submitBtn = document.getElementById('submitUtrBtn');
-    if (submitBtn) { submitBtn.disabled = true; submitBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Submitting...'; }
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Submitting...';
+    }
 
     try {
-      // Direct Firestore document recording
       await addDoc(collection(db, 'upgradeRequests'), {
         userUid: user.uid,
         email: user.email,
@@ -874,39 +1177,42 @@ if (upiConfirmForm) {
       });
 
       upiModal?.classList.remove('show');
-      alert(`Thank you! Payment request for ${activePlan.name} (UTR: ${utr}) submitted. Storage will be activated after verification.`);
+      alert(`Payment reference for ${activePlan.name} (UTR: ${utr}) submitted successfully. Your quota will be verified and upgraded shortly.`);
     } catch (err) {
       alert(err.message || 'Submission failed. Please try again.');
     } finally {
-      if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = '<i class="fa-solid fa-check"></i> Submit Verification Request'; }
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="fa-solid fa-check"></i> Submit Verification Request';
+      }
     }
   });
 }
 
 // =============================================
-// REFERRAL & FREE STORAGE SYSTEM MODAL
+// REFERRAL & BONUS STORAGE MODAL
 // =============================================
-function openReferralModal() {
-  if (!referralModal) return;
-  const user = getCurrentUser();
-  const link = profile?.referralLink || getReferralLink(user);
-  const totalReferrals = profile?.totalReferrals || 0;
-  const bonusBytes = profile?.referralBonusBytes || 0;
-
-  if (referralLinkInput) referralLinkInput.value = link;
-  if (referralStatsText) {
-    referralStatsText.textContent = `You've invited ${totalReferrals} user${totalReferrals !== 1 ? 's' : ''} and earned ${formatBytes(bonusBytes)} in free bonus storage!`;
-  }
-  if (shareReferralWaBtn) {
-    const waText = encodeURIComponent(`Join Zulora Drive with my referral link and get 5 GB free storage bonus! ${link}`);
-    shareReferralWaBtn.href = `https://wa.me/?text=${waText}`;
-  }
-  userDropdown?.classList.remove('show');
-  referralModal.classList.add('show');
-}
-
 document.querySelectorAll('[data-open-referral]').forEach((btn) => {
-  btn.addEventListener('click', openReferralModal);
+  btn.addEventListener('click', () => {
+    userDropdown?.classList.remove('show');
+    const user = getCurrentUser();
+    const link = getReferralLink(user);
+
+    if (referralLinkInput) referralLinkInput.value = link;
+
+    if (shareReferralWaBtn) {
+      const waMsg = `Hey! Join me on Zulora Drive for secure cloud storage and get 5 GB free storage: ${link}`;
+      shareReferralWaBtn.href = `https://wa.me/?text=${encodeURIComponent(waMsg)}`;
+    }
+
+    if (referralStatsText) {
+      const bonus = formatBytes(profile?.referralBonusBytes || 0);
+      const count = profile?.totalReferrals || 0;
+      referralStatsText.textContent = `You have earned ${bonus} bonus storage across ${count} referral${count === 1 ? '' : 's'}.`;
+    }
+
+    referralModal?.classList.add('show');
+  });
 });
 
 if (copyReferralBtn) {
@@ -915,26 +1221,33 @@ if (copyReferralBtn) {
     if (!link) return;
     navigator.clipboard.writeText(link);
     copyReferralBtn.innerHTML = '<i class="fa-solid fa-check"></i> Copied!';
-    setTimeout(() => { copyReferralBtn.innerHTML = '<i class="fa-solid fa-copy"></i> Copy Link'; }, 2500);
+    setTimeout(() => {
+      copyReferralBtn.innerHTML = '<i class="fa-regular fa-copy"></i> Copy Link';
+    }, 2000);
   });
 }
 
 // =============================================
-// ADMIN CONSOLE (Direct Firestore)
+// ADMIN CONSOLE & QUOTA OVERRIDE (zulora.help@gmail.com)
 // =============================================
 if (adminDashboardBtn) {
   adminDashboardBtn.addEventListener('click', async () => {
     userDropdown?.classList.remove('show');
     adminModal?.classList.add('show');
+
     try {
       const usersSnap = await getDocs(collection(db, 'users'));
       const users = usersSnap.docs.map((d) => ({ uid: d.id, ...d.data() }));
 
       let totalStorage = 0;
-      users.forEach((u) => { totalStorage += Number(u.usedStorageBytes || u.storageUsed || 0); });
+      let totalFileCount = 0;
+
+      users.forEach((u) => {
+        totalStorage += Number(u.usedStorageBytes || u.storageUsed || 0);
+      });
 
       if (adminTotalUsers) adminTotalUsers.textContent = users.length;
-      if (adminTotalFiles) adminTotalFiles.textContent = '—';
+      if (adminTotalFiles) adminTotalFiles.textContent = allFiles.length || '—';
       if (adminTotalStorage) adminTotalStorage.textContent = formatBytes(totalStorage);
 
       if (adminUsersTableBody) {
@@ -942,42 +1255,64 @@ if (adminDashboardBtn) {
         users.forEach((u) => {
           const tr = document.createElement('tr');
           const used = formatBytes(u.usedStorageBytes || u.storageUsed || 0);
-          const limitGb = Math.round((u.storageLimitBytes || u.storageLimit || 10 * 1024 ** 3) / (1024 ** 3));
-          tr.innerHTML = `<td style="font-weight:500;">${u.email || u.uid}</td><td>${used}</td><td><b>${limitGb} GB</b></td>
-            <td><button class="btn btn-azure-soft" style="height:28px;padding:0 8px;font-size:0.78rem;" data-uid="${u.uid}" data-email="${u.email}" data-limit="${limitGb}">Edit</button></td>`;
-          tr.querySelector('button').addEventListener('click', () => promptEditQuota(u.uid, u.email, limitGb));
+          const limitGb = Math.round((u.storageLimitBytes || u.storageLimit || DEFAULT_STORAGE_BYTES) / (1024 ** 3));
+
+          tr.innerHTML = `
+            <td style="font-weight:600;">${u.email || u.uid}</td>
+            <td>${used}</td>
+            <td><strong>${limitGb} GB</strong></td>
+            <td>
+              <button class="btn btn-azure-soft btn-sm" data-uid="${u.uid}" data-email="${u.email}" data-limit="${limitGb}">
+                <i class="fa-solid fa-pen"></i> Override Quota
+              </button>
+            </td>
+          `;
+
+          tr.querySelector('button')?.addEventListener('click', () => {
+            promptEditQuota(u.uid, u.email, limitGb);
+          });
+
           adminUsersTableBody.appendChild(tr);
         });
       }
-    } catch (err) { alert('Admin data load notice: ' + err.message); }
+    } catch (err) {
+      alert('Admin data load notice: ' + err.message);
+    }
   });
 }
 
 async function promptEditQuota(uid, email, currentGb) {
-  const input = prompt(`New storage quota (GB) for ${email}:`, currentGb);
+  const input = prompt(`Set custom storage quota (in GB) for ${email}:`, currentGb);
   if (!input) return;
   const newGb = parseInt(input, 10);
-  if (isNaN(newGb) || newGb < 1 || newGb > 50000) { alert('Enter a number between 1 and 50000.'); return; }
+  if (isNaN(newGb) || newGb < 1 || newGb > 50000) {
+    alert('Please enter a valid number between 1 and 50,000 GB.');
+    return;
+  }
+
   try {
-    const newLimit = Math.floor(newGb * 1024 ** 3);
-    await updateDoc(doc(db, 'users', uid), {
-      storageLimitBytes: newLimit,
-      storageLimit: newLimit,
-      planType: newGb > 10 ? 'Pro' : 'Free',
-      tier: newGb > 10 ? 'pro' : 'free',
-      updatedAt: serverTimestamp()
-    });
-    alert(`Storage for ${email} updated to ${newGb} GB.`);
-    adminDashboardBtn.click();
-  } catch (err) { alert(err.message || 'Update failed.'); }
+    const newLimitBytes = Math.floor(newGb * 1024 ** 3);
+    await updateUserQuota(uid, newLimitBytes);
+    alert(`Storage quota for ${email} successfully overridden to ${newGb} GB!`);
+    if (adminDashboardBtn) adminDashboardBtn.click();
+    const updated = await refreshProfile().catch(() => null);
+    if (updated) updateStorageUI(updated);
+  } catch (err) {
+    alert(err.message || 'Quota override update failed.');
+  }
 }
 
 // =============================================
 // MODAL CLOSE CONTROLS
 // =============================================
 document.querySelectorAll('.modal-close').forEach((btn) => {
-  btn.addEventListener('click', (e) => e.target.closest('.modal-backdrop')?.classList.remove('show'));
+  btn.addEventListener('click', (e) => {
+    e.target.closest('.modal-backdrop')?.classList.remove('show');
+  });
 });
+
 document.querySelectorAll('.modal-backdrop').forEach((modal) => {
-  modal.addEventListener('click', (e) => { if (e.target === modal) modal.classList.remove('show'); });
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) modal.classList.remove('show');
+  });
 });
