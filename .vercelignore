@@ -1,4 +1,3 @@
-api/
-backend/
 node_modules/
 .git/
+*.log
