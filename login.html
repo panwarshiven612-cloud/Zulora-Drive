@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Zulora Drive — Sign In & Authentication</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="auth-page">
+  <div class="auth-wrapper">
+    <div class="auth-card">
+      <!-- BRAND HEADER -->
+      <div class="auth-brand">
+        <div class="auth-logo-badge">
+          <i class="fa-solid fa-cloud"></i>
+        </div>
+        <h1 class="auth-title">Zulora Drive</h1>
+        <p class="auth-subtitle">Enterprise Cloud Storage & Direct File Sync</p>
+      </div>
+
+      <!-- AUTH TABS -->
+      <div class="auth-tabs">
+        <button id="tabSignIn" class="auth-tab active" type="button">Sign In</button>
+        <button id="tabSignUp" class="auth-tab" type="button">Sign Up</button>
+      </div>
+
+      <!-- ERROR / ALERT BANNER -->
+      <div id="authAlert" class="auth-alert" style="display: none;"></div>
+
+      <!-- GOOGLE SIGN-IN BUTTON -->
+      <button id="googleSignInBtn" class="btn btn-google-auth" type="button">
+        <svg width="18" height="18" viewBox="0 0 18 18">
+          <path fill="#4285F4" d="M17.64 9.2c0-.74-.06-1.28-.19-1.84H9v3.34h4.96c-.1.83-.64 2.08-1.84 2.92l2.84 2.2c1.7-1.57 2.68-3.88 2.68-6.62z"/>
+          <path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.84-2.2c-.8.54-1.83.86-3.12.86-2.4 0-4.43-1.62-5.16-3.8l-2.9 2.24C2.43 15.72 5.46 18 9 18z"/>
+          <path fill="#FBBC05" d="M3.84 10.68c-.19-.54-.3-1.12-.3-1.68s.11-1.14.3-1.68L.94 5.08C.34 6.26 0 7.59 0 9s.34 2.74.94 3.92l2.9-2.24z"/>
+          <path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0 5.46 0 2.43 2.28.94 5.08l2.9 2.24c.73-2.18 2.76-3.74 5.16-3.74z"/>
+        </svg>
+        <span>Continue with Google</span>
+      </button>
+
+      <div class="auth-divider">
+        <span>OR EMAIL</span>
+      </div>
+
+      <!-- FORM -->
+      <form id="authForm" autocomplete="on">
+        <div id="nameGroup" class="form-group" style="display: none;">
+          <label for="authName" class="form-label">Full Name</label>
+          <input type="text" id="authName" placeholder="John Doe" autocomplete="name">
+        </div>
+
+        <div class="form-group">
+          <label for="authEmail" class="form-label">Email Address</label>
+          <input type="email" id="authEmail" placeholder="name@example.com" required autocomplete="email">
+        </div>
+
+        <div class="form-group">
+          <label for="authPassword" class="form-label">Password</label>
+          <input type="password" id="authPassword" placeholder="••••••••" required autocomplete="current-password">
+        </div>
+
+        <div id="forgotRow" class="form-subrow">
+          <a href="#" id="forgotPasswordBtn" class="forgot-link">Forgot password?</a>
+        </div>
+
+        <button type="submit" id="authSubmitBtn" class="btn btn-azure-gradient btn-full">
+          <span>Sign In</span>
+        </button>
+      </form>
+
+      <!-- FOOTER TOGGLE -->
+      <div class="auth-footer">
+        <span id="authFooterText">Don't have an account?</span>
+        <a href="#" id="toggleAuthModeBtn" class="auth-link">Sign up free</a>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import {
+      signInWithGoogle,
+      signInWithEmail,
+      registerWithEmail,
+      resetPassword,
+      onAuthChange,
+      friendlyAuthError
+    } from './auth.js';
+
+    let isSignUp = false;
+
+    // Redirect logged in users directly to index.html
+    onAuthChange((user) => {
+      if (user) {
+        window.location.replace('index.html');
+      }
+    });
+
+    const tabSignIn = document.getElementById('tabSignIn');
+    const tabSignUp = document.getElementById('tabSignUp');
+    const nameGroup = document.getElementById('nameGroup');
+    const authForm = document.getElementById('authForm');
+    const authSubmitBtn = document.getElementById('authSubmitBtn');
+    const authAlert = document.getElementById('authAlert');
+    const googleSignInBtn = document.getElementById('googleSignInBtn');
+    const forgotPasswordBtn = document.getElementById('forgotPasswordBtn');
+    const forgotRow = document.getElementById('forgotRow');
+    const toggleAuthModeBtn = document.getElementById('toggleAuthModeBtn');
+    const authFooterText = document.getElementById('authFooterText');
+
+    function setAuthMode(signUp) {
+      isSignUp = signUp;
+      authAlert.style.display = 'none';
+
+      if (isSignUp) {
+        tabSignUp.classList.add('active');
+        tabSignIn.classList.remove('active');
+        nameGroup.style.display = 'block';
+        forgotRow.style.display = 'none';
+        authSubmitBtn.querySelector('span').textContent = 'Create Account';
+        authFooterText.textContent = 'Already have an account?';
+        toggleAuthModeBtn.textContent = 'Sign in';
+      } else {
+        tabSignIn.classList.add('active');
+        tabSignUp.classList.remove('active');
+        nameGroup.style.display = 'none';
+        forgotRow.style.display = 'block';
+        authSubmitBtn.querySelector('span').textContent = 'Sign In';
+        authFooterText.textContent = "Don't have an account?";
+        toggleAuthModeBtn.textContent = 'Sign up free';
+      }
+    }
+
+    tabSignIn.addEventListener('click', () => setAuthMode(false));
+    tabSignUp.addEventListener('click', () => setAuthMode(true));
+    toggleAuthModeBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      setAuthMode(!isSignUp);
+    });
+
+    function showAlert(message, type = 'danger') {
+      authAlert.className = `auth-alert ${type}`;
+      authAlert.textContent = message;
+      authAlert.style.display = 'block';
+    }
+
+    // Google Auth
+    googleSignInBtn.addEventListener('click', async () => {
+      authAlert.style.display = 'none';
+      try {
+        await signInWithGoogle();
+        // Redirect handled by onAuthChange
+      } catch (err) {
+        showAlert(friendlyAuthError(err));
+      }
+    });
+
+    // Form Submit (Email / Password)
+    authForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      authAlert.style.display = 'none';
+
+      const email = document.getElementById('authEmail').value.trim();
+      const password = document.getElementById('authPassword').value;
+
+      if (!email || !password) {
+        return showAlert('Please fill out all required fields.');
+      }
+
+      authSubmitBtn.disabled = true;
+      authSubmitBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Processing...';
+
+      try {
+        if (isSignUp) {
+          await registerWithEmail(email, password);
+        } else {
+          await signInWithEmail(email, password);
+        }
+      } catch (err) {
+        showAlert(friendlyAuthError(err));
+        authSubmitBtn.disabled = false;
+        authSubmitBtn.querySelector('span')
+          ? (authSubmitBtn.querySelector('span').textContent = isSignUp ? 'Create Account' : 'Sign In')
+          : (authSubmitBtn.textContent = isSignUp ? 'Create Account' : 'Sign In');
+      }
+    });
+
+    // Password Reset
+    forgotPasswordBtn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      authAlert.style.display = 'none';
+      const email = document.getElementById('authEmail').value.trim();
+
+      if (!email) {
+        return showAlert('Please enter your email address above to reset password.', 'warning');
+      }
+
+      try {
+        await resetPassword(email);
+        showAlert(`Password reset email sent to ${email}. Please check your inbox.`, 'success');
+      } catch (err) {
+        showAlert(friendlyAuthError(err));
+      }
+    });
+  </script>
+</body>
+</html>

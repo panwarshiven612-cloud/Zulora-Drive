@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Zulora Drive — Secure Cloud Storage & Collaboration</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app-container">
+    <!-- APP HEADER / TOPBAR -->
+    <header class="app-header">
+      <div class="header-left">
+        <button id="mobileMenuBtn" class="mobile-menu-btn" aria-label="Toggle Navigation Menu">
+          <i class="fa-solid fa-bars"></i>
+        </button>
+        <a href="index.html" class="brand-logo">
+          <div class="brand-icon">
+            <i class="fa-solid fa-cloud"></i>
+          </div>
+          <span class="brand-name">Zulora Drive</span>
+        </a>
+      </div>
+
+      <div class="header-center">
+        <div class="search-container">
+          <i class="fa-solid fa-magnifying-glass search-icon"></i>
+          <input type="text" id="globalSearchInput" placeholder="Search files, photos, documents, and media..." autocomplete="off">
+          <button id="searchClearBtn" class="search-clear-btn" style="display: none;" title="Clear search">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+      </div>
+
+      <div class="header-right">
+        <div class="user-menu-wrapper">
+          <button id="userAvatarBtn" class="user-avatar-btn" title="Account settings">
+            <span id="userInitials">Z</span>
+          </button>
+
+          <!-- USER DROPDOWN MENU -->
+          <div id="userDropdown" class="user-dropdown">
+            <div class="dropdown-header">
+              <div class="dropdown-avatar">
+                <span id="dropdownInitials">Z</span>
+              </div>
+              <div class="dropdown-user-info">
+                <div id="dropdownName" class="dropdown-name">Zulora User</div>
+                <div id="dropdownUsername" class="dropdown-username">@user</div>
+                <div id="dropdownEmail" class="dropdown-email">user@zulora.in</div>
+                <div id="dropdownAccountId" class="dropdown-account-id">Account: ZUL-000000</div>
+                <div id="dropdownPlanBadge" class="plan-badge">Free · 10 GB</div>
+              </div>
+            </div>
+
+            <div class="dropdown-divider"></div>
+
+            <div class="dropdown-menu">
+              <button id="dropdownUpgradeBtn" class="dropdown-item primary-highlight">
+                <i class="fa-solid fa-crown"></i>
+                <span>Upgrade Plan</span>
+              </button>
+
+              <button id="openPlansModalBtn" class="dropdown-item">
+                <i class="fa-solid fa-layer-group"></i>
+                <span>Pricing & Quotas</span>
+              </button>
+
+              <button class="dropdown-item" data-open-referral>
+                <i class="fa-solid fa-gift"></i>
+                <span>Invite & Earn +5 GB</span>
+              </button>
+
+              <button id="adminDashboardBtn" class="dropdown-item admin-link" style="display: none;">
+                <i class="fa-solid fa-user-shield"></i>
+                <span>Admin Dashboard</span>
+              </button>
+
+              <div class="dropdown-divider"></div>
+
+              <button id="logoutBtn" class="dropdown-item danger">
+                <i class="fa-solid fa-right-from-bracket"></i>
+                <span>Sign Out</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- APP BODY -->
+    <div class="app-body">
+      <!-- SIDEBAR -->
+      <aside id="appSidebar" class="app-sidebar">
+        <div class="sidebar-action-box">
+          <button id="newUploadBtn" class="btn btn-azure-gradient btn-upload">
+            <i class="fa-solid fa-plus"></i>
+            <span>Upload File</span>
+          </button>
+          <input type="file" id="fileUploadInput" multiple hidden>
+        </div>
+
+        <nav class="sidebar-nav">
+          <div class="nav-section-label">NAVIGATE</div>
+          <button class="nav-item active" data-nav="my-drive">
+            <i class="fa-regular fa-folder"></i>
+            <span>My Drive</span>
+          </button>
+          <button class="nav-item" data-category="images">
+            <i class="fa-regular fa-image"></i>
+            <span>Photos & Media</span>
+          </button>
+          <button class="nav-item" data-category="documents">
+            <i class="fa-regular fa-file-lines"></i>
+            <span>Documents</span>
+          </button>
+          <button class="nav-item" data-category="videos">
+            <i class="fa-regular fa-file-video"></i>
+            <span>Videos</span>
+          </button>
+          <button class="nav-item" data-category="audio">
+            <i class="fa-regular fa-file-audio"></i>
+            <span>Audio Files</span>
+          </button>
+          <button class="nav-item" data-category="archives">
+            <i class="fa-regular fa-file-zipper"></i>
+            <span>Archives & Zips</span>
+          </button>
+          <button class="nav-item" data-nav="starred">
+            <i class="fa-regular fa-star"></i>
+            <span>Starred Files</span>
+          </button>
+
+          <div class="nav-section-label" style="margin-top: 16px;">BONUS STORAGE</div>
+          <button class="nav-item referral-item" data-open-referral>
+            <i class="fa-solid fa-gift"></i>
+            <span>Refer & Earn +5GB</span>
+          </button>
+        </nav>
+
+        <!-- STORAGE METER WIDGET -->
+        <div class="storage-widget">
+          <div class="storage-widget-header">
+            <span class="storage-widget-title"><i class="fa-solid fa-cloud"></i> Storage Meter</span>
+            <span id="storagePercentText" class="storage-percent">0%</span>
+          </div>
+
+          <div class="storage-bar-track">
+            <div id="storageProgressBar" class="storage-bar-fill" style="width: 0%;"></div>
+          </div>
+
+          <div id="storageUsageDetails" class="storage-details">0 B of 10 GB used</div>
+
+          <button id="sidebarUpgradeBtn" class="btn btn-azure-soft btn-full">
+            <i class="fa-solid fa-bolt"></i>
+            <span>Upgrade Storage</span>
+          </button>
+        </div>
+      </aside>
+
+      <!-- MAIN WORKSPACE CONTENT -->
+      <main class="app-main">
+        <!-- QUOTA WARNING BANNER -->
+        <div id="quotaWarningBanner" class="storage-banner warning" style="display: none;">
+          <div class="banner-content">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+            <span id="quotaWarningText">Notice: You are approaching your storage limit.</span>
+          </div>
+          <button id="bannerUpgradeBtn" class="btn btn-azure-sm">Upgrade Now</button>
+        </div>
+
+        <!-- MAIN TOOLBAR -->
+        <div class="main-toolbar">
+          <div class="toolbar-left">
+            <h1 id="currentViewTitle" class="view-title">My Drive</h1>
+          </div>
+
+          <div class="toolbar-right">
+            <div class="sort-wrapper">
+              <label for="sortBySelect" class="sort-label">Sort by:</label>
+              <select id="sortBySelect" class="sort-select">
+                <option value="date-desc">Newest First</option>
+                <option value="date-asc">Oldest First</option>
+                <option value="name-asc">Name (A-Z)</option>
+                <option value="name-desc">Name (Z-A)</option>
+                <option value="size-desc">Size (Largest)</option>
+                <option value="size-asc">Size (Smallest)</option>
+              </select>
+            </div>
+
+            <div class="view-toggle-group">
+              <button id="viewGridBtn" class="btn-icon active" title="Grid View">
+                <i class="fa-solid fa-border-all"></i>
+              </button>
+              <button id="viewListBtn" class="btn-icon" title="List View">
+                <i class="fa-solid fa-list"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- WORKSPACE AREA -->
+        <div id="mainWorkspace" class="main-workspace">
+          <!-- DRAG & DROP OVERLAY -->
+          <div id="dropzoneOverlay" class="dropzone-overlay" style="display: none;">
+            <div class="dropzone-box">
+              <i class="fa-solid fa-cloud-arrow-up"></i>
+              <p>Drop files here to upload directly to Zulora Drive</p>
+            </div>
+          </div>
+
+          <!-- GRID VIEW -->
+          <div id="filesGrid" class="files-grid"></div>
+
+          <!-- LIST VIEW CONTAINER -->
+          <div id="filesListContainer" class="files-list-container" style="display: none;">
+            <table class="files-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Size</th>
+                  <th>Uploaded</th>
+                  <th style="text-align: right;">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="filesTableBody"></tbody>
+            </table>
+          </div>
+
+          <!-- EMPTY STATE -->
+          <div id="emptyState" class="empty-state" style="display: none;">
+            <div class="empty-state-icon">
+              <i class="fa-regular fa-folder-open"></i>
+            </div>
+            <h2>No files here yet</h2>
+            <p>Upload your files, photos, or documents to store them securely in the cloud.</p>
+            <button id="emptyUploadBtn" class="btn btn-azure-gradient">
+              <i class="fa-solid fa-cloud-arrow-up"></i>
+              <span>Upload Files</span>
+            </button>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- UPLOAD PROGRESS DRAWER -->
+  <div id="uploadDrawer" class="upload-drawer" style="display: none;">
+    <div class="drawer-header">
+      <span id="uploadDrawerStatus" class="drawer-status">Uploading files...</span>
+      <button id="closeUploadDrawerBtn" class="drawer-close-btn">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+    <div id="uploadDrawerBody" class="drawer-body"></div>
+  </div>
+
+  <!-- CUSTOM FILE CONTEXT MENU -->
+  <div id="fileContextMenu" class="context-menu" style="display: none;">
+    <button class="context-item" data-action="preview">
+      <i class="fa-regular fa-eye"></i> Preview
+    </button>
+    <button class="context-item" data-action="download">
+      <i class="fa-solid fa-download"></i> Download
+    </button>
+    <button class="context-item" data-action="star">
+      <i class="fa-regular fa-star"></i> Toggle Star
+    </button>
+    <button class="context-item" data-action="rename">
+      <i class="fa-regular fa-pen-to-square"></i> Rename
+    </button>
+    <div class="context-divider"></div>
+    <button class="context-item danger" data-action="delete">
+      <i class="fa-regular fa-trash-can"></i> Delete
+    </button>
+  </div>
+
+  <!-- MODAL: STORAGE PLANS -->
+  <div id="plansModal" class="modal-backdrop">
+    <div class="modal-card modal-lg">
+      <div class="modal-header">
+        <h2 class="modal-title"><i class="fa-solid fa-layer-group"></i> Upgrade Storage Plan</h2>
+        <button class="modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="plans-grid">
+          <!-- Free Plan -->
+          <div class="plan-card">
+            <div class="plan-header">
+              <h3 class="plan-name">Free Starter</h3>
+              <div class="plan-price">₹0 <span>/ forever</span></div>
+              <div class="plan-storage">10 GB Storage</div>
+            </div>
+            <ul class="plan-features">
+              <li><i class="fa-solid fa-check"></i> Standard Cloud Storage</li>
+              <li><i class="fa-solid fa-check"></i> File Preview & Sharing</li>
+              <li><i class="fa-solid fa-check"></i> +5 GB Bonus per Referral</li>
+            </ul>
+            <button class="btn btn-secondary btn-full" disabled>Current Plan</button>
+          </div>
+
+          <!-- Starter Plan -->
+          <div class="plan-card">
+            <div class="plan-header">
+              <h3 class="plan-name">Starter Drive</h3>
+              <div class="plan-price">₹49 <span>/ month</span></div>
+              <div class="plan-storage">50 GB Storage</div>
+            </div>
+            <ul class="plan-features">
+              <li><i class="fa-solid fa-check"></i> 50 GB Cloud Storage</li>
+              <li><i class="fa-solid fa-check"></i> High-Speed Uploads</li>
+              <li><i class="fa-solid fa-check"></i> Priority Email Support</li>
+            </ul>
+            <button class="btn btn-azure-gradient btn-full" data-plan="starter" data-name="Starter Drive (50 GB)" data-price="49">Select Plan</button>
+          </div>
+
+          <!-- Pro Plan -->
+          <div class="plan-card popular">
+            <div class="plan-badge">MOST POPULAR</div>
+            <div class="plan-header">
+              <h3 class="plan-name">Pro Power</h3>
+              <div class="plan-price">₹149 <span>/ month</span></div>
+              <div class="plan-storage">200 GB Storage</div>
+            </div>
+            <ul class="plan-features">
+              <li><i class="fa-solid fa-check"></i> 200 GB Storage</li>
+              <li><i class="fa-solid fa-check"></i> Instant UPI Activation</li>
+              <li><i class="fa-solid fa-check"></i> VIP Support Access</li>
+            </ul>
+            <button class="btn btn-azure-gradient btn-full" data-plan="pro" data-name="Pro Power (200 GB)" data-price="149">Upgrade to Pro</button>
+          </div>
+
+          <!-- Enterprise Plan -->
+          <div class="plan-card">
+            <div class="plan-header">
+              <h3 class="plan-name">Enterprise Drive</h3>
+              <div class="plan-price">₹499 <span>/ month</span></div>
+              <div class="plan-storage">1 TB Storage</div>
+            </div>
+            <ul class="plan-features">
+              <li><i class="fa-solid fa-check"></i> 1,000 GB (1 TB) Storage</li>
+              <li><i class="fa-solid fa-check"></i> Max File Size Limits</li>
+              <li><i class="fa-solid fa-check"></i> 24/7 Dedicated Support</li>
+            </ul>
+            <button class="btn btn-azure-gradient btn-full" data-plan="enterprise" data-name="Enterprise (1 TB)" data-price="499">Select Plan</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: UPI PAYMENT VERIFICATION -->
+  <div id="upiModal" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 id="upiModalPlanTitle" class="modal-title"><i class="fa-solid fa-qrcode"></i> UPI Upgrade Payment</h2>
+        <button class="modal-close">&times;</button>
+      </div>
+      <div class="modal-body text-center">
+        <p class="payment-instruction">Scan QR Code using any UPI App (GPay, PhonePe, Paytm)</p>
+        <div class="qr-container">
+          <img id="upiQrCodeImg" src="" alt="UPI QR Code" class="upi-qr-image">
+        </div>
+        <div id="upiModalAmountText" class="payment-amount-display">Amount: ₹0</div>
+
+        <div class="payment-actions-row">
+          <button id="copyUpiBtn" class="btn btn-secondary btn-sm">
+            <i class="fa-solid fa-copy"></i> Copy UPI ID
+          </button>
+          <a id="payUpiDeepLink" href="#" target="_blank" class="btn btn-azure-soft btn-sm">
+            <i class="fa-solid fa-mobile-screen"></i> Pay in App
+          </a>
+        </div>
+
+        <form id="upiConfirmForm" class="utr-form">
+          <div class="form-group">
+            <label for="utrInput" class="form-label">Enter 12-Digit UTR / Transaction Ref No.</label>
+            <input type="text" id="utrInput" placeholder="e.g. 423910582910" required pattern="[A-Za-z0-9]{8,18}">
+          </div>
+          <button type="submit" id="submitUtrBtn" class="btn btn-azure-gradient btn-full">
+            <i class="fa-solid fa-check"></i> Submit Verification Request
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: PREVIEW -->
+  <div id="previewModal" class="modal-backdrop">
+    <div class="modal-card modal-lg">
+      <div class="modal-header">
+        <h2 id="previewTitle" class="modal-title">File Preview</h2>
+        <div class="modal-header-actions">
+          <a id="previewDownloadBtn" href="#" download class="btn btn-azure-sm">
+            <i class="fa-solid fa-download"></i> Download
+          </a>
+          <button class="modal-close">&times;</button>
+        </div>
+      </div>
+      <div class="modal-body">
+        <div id="previewContainer" class="preview-viewport"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: RENAME FILE -->
+  <div id="renameModal" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 class="modal-title"><i class="fa-regular fa-pen-to-square"></i> Rename File</h2>
+        <button class="modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="renameForm">
+          <div class="form-group">
+            <label for="renameInput" class="form-label">New Filename</label>
+            <input type="text" id="renameInput" required>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary modal-close">Cancel</button>
+            <button type="submit" class="btn btn-azure-gradient">Save Name</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: DELETE CONFIRMATION -->
+  <div id="deleteModal" class="modal-backdrop">
+    <div class="modal-card modal-sm">
+      <div class="modal-header">
+        <h2 class="modal-title danger-text"><i class="fa-solid fa-triangle-exclamation"></i> Confirm Deletion</h2>
+        <button class="modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p>Are you sure you want to permanently delete this file? This action cannot be undone.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary modal-close">Cancel</button>
+        <button id="confirmDeleteBtn" type="button" class="btn btn-danger">Delete File</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: REFERRAL BONUS -->
+  <div id="referralModal" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 class="modal-title"><i class="fa-solid fa-gift"></i> Invite & Earn Free Storage</h2>
+        <button class="modal-close">&times;</button>
+      </div>
+      <div class="modal-body text-center">
+        <div class="referral-icon-badge">
+          <i class="fa-solid fa-cloud-arrow-up"></i>
+        </div>
+        <h3>Get +5 GB Free per Referral!</h3>
+        <p>Share your unique referral link with friends. Whenever someone signs up using your link, both of you instantly get 5 GB extra cloud storage space!</p>
+
+        <div class="referral-input-group">
+          <input type="text" id="referralLinkInput" readonly>
+          <button id="copyReferralBtn" class="btn btn-azure-gradient">
+            <i class="fa-solid fa-copy"></i> Copy Link
+          </button>
+        </div>
+
+        <div class="share-options-row">
+          <a id="shareReferralWaBtn" href="#" target="_blank" class="btn btn-whatsapp btn-full">
+            <i class="fa-brands fa-whatsapp"></i> Share via WhatsApp
+          </a>
+        </div>
+
+        <div id="referralStatsText" class="referral-stats">
+          You have earned 0 B in bonus storage.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: ADMIN CONSOLE -->
+  <div id="adminModal" class="modal-backdrop">
+    <div class="modal-card modal-lg">
+      <div class="modal-header">
+        <h2 class="modal-title"><i class="fa-solid fa-user-shield"></i> Zulora Admin Dashboard</h2>
+        <button class="modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="admin-stats-grid">
+          <div class="stat-card">
+            <div class="stat-value" id="adminTotalUsers">0</div>
+            <div class="stat-label">Total Users</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="adminTotalFiles">—</div>
+            <div class="stat-label">Files Uploaded</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="adminTotalStorage">0 B</div>
+            <div class="stat-label">Total Storage Used</div>
+          </div>
+        </div>
+
+        <h3 class="admin-subtitle">Registered User Accounts</h3>
+        <div class="table-responsive">
+          <table class="files-table">
+            <thead>
+              <tr>
+                <th>User Email / UID</th>
+                <th>Used Space</th>
+                <th>Storage Quota</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="adminUsersTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PRIMARY APP LOGIC -->
+  <script type="module" src="app.js"></script>
+</body>
+</html>
