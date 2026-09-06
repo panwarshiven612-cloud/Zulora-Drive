@@ -660,6 +660,18 @@ app.patch('/api/admin/upgrade-requests/:requestId', requireFirebase, authenticat
   } catch (error) { next(error); }
 });
 
+// UPI payment endpoint
+app.post('/api/payments/upi', requireFirebase, async (req, res, next) => {
+  try {
+    const { amount, name } = req.body;
+    if (!amount || !name) throw new ApiError(400, 'Amount and name required.', 'INVALID_INPUT');
+    // Placeholder: real UPI integration would happen here
+    res.json({ status: 'ok', upiId: 'shivenpanwar@fam', amount, name });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // Serve the client application, but never the uploads tree.
 app.use(express.static(FRONTEND_ROOT, {
   extensions: ['html'], index: 'index.html', maxAge: process.env.NODE_ENV === 'production' ? '1h' : 0
