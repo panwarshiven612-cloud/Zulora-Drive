@@ -1,7 +1,4 @@
-# Vercel Deployment Exclusions
-node_modules
-.env
-.env.*
-*.log
-*.DS_Store
 backend/
+node_modules/
+.git/
+*.log
