@@ -150,6 +150,7 @@ export const FieldValue = {
 };
 
 export const firebase = {
+  auth: () => auth,
   firestore: {
     FieldValue
   }

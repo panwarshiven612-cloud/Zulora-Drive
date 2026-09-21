@@ -601,6 +601,29 @@
     </div>
   </div>
 
+  <!-- MOBILE BOTTOM NAVIGATION (Google Drive Mobile Style) -->
+  <nav class="mobile-bottom-nav" aria-label="Mobile Navigation">
+    <button class="mobile-nav-btn active" data-mobile-nav="my-drive">
+      <i class="fa-solid fa-folder"></i>
+      <span>Files</span>
+    </button>
+    <button class="mobile-nav-btn" data-mobile-nav="recent">
+      <i class="fa-solid fa-clock"></i>
+      <span>Recent</span>
+    </button>
+    <button class="mobile-nav-upload-btn" id="mobileBottomUploadBtn" aria-label="Upload File">
+      <i class="fa-solid fa-plus"></i>
+    </button>
+    <button class="mobile-nav-btn" data-mobile-nav="starred">
+      <i class="fa-solid fa-star"></i>
+      <span>Starred</span>
+    </button>
+    <button class="mobile-nav-btn" id="mobileStorageBtn" data-mobile-nav="storage">
+      <i class="fa-solid fa-cloud"></i>
+      <span id="mobileStoragePercent">0%</span>
+    </button>
+  </nav>
+
   <!-- PRIMARY APP SCRIPT -->
   <script type="module" src="app.js"></script>
 </body>

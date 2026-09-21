@@ -65,6 +65,18 @@ import {
   firebase
 } from './firebase-config.js';
 
+// ── Platform Configuration & Cloudinary Credentials ───────────────────────────
+export const CLOUD_NAME = "t3dkhv0z";
+export const UPLOAD_PRESET = "zulora_preset";
+export const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyBGOtawcfRqXTm7jw5P3DB0qhJCUTmfyDc",
+  authDomain: "zulora-drive.firebaseapp.com",
+  projectId: "zulora-drive",
+  storageBucket: "zulora-drive.firebasestorage.app",
+  messagingSenderId: "715420173020",
+  appId: "1:715420173020:web:46245edda3eb0f31edaa19"
+};
+
 // ══════════════════════════════════════════════════════════════════════════════
 // GLOBAL APPLICATION STATE
 // ══════════════════════════════════════════════════════════════════════════════
@@ -227,6 +239,8 @@ function updateStorageUI(p) {
   const percent = limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : 0;
 
   if (storagePercentText) storagePercentText.textContent = `${percent}%`;
+  const mobileStoragePercent = $('mobileStoragePercent');
+  if (mobileStoragePercent) mobileStoragePercent.textContent = `${percent}%`;
 
   if (storageProgressBar) {
     storageProgressBar.style.width      = `${percent}%`;
@@ -1058,158 +1072,186 @@ function dismissProgressPopup() {
   if (uploadDrawer) {
     uploadDrawer.classList.remove('show');
     setTimeout(() => {
-      if (uploadDrawer) uploadDrawer.style.display = 'none';
-    }, 250);
+      if (uploadDrawer) {
+        uploadDrawer.style.display = 'none';
+        if (uploadDrawerBody) uploadDrawerBody.innerHTML = '';
+      }
+    }, 300);
+  }
+  if (currentActiveProgressBar) {
+    currentActiveProgressBar.style.width = '0%';
+  }
+  if (currentActiveProgressStatus) {
+    currentActiveProgressStatus.textContent = '0%';
   }
 }
 
 /**
- * Cloudinary Upload Pipeline with strict user isolation & explicit progress tracking:
+ * Asynchronous Cloudinary Upload Pipeline:
  *   - Checks Firebase Authentication status before upload
- *   - Constructs FormData with upload_preset 'zulora_preset' and user folder
- *   - Tracks upload progress via XMLHttpRequest events (onloadstart, onprogress, onload)
- *   - Handles CORS and network errors explicitly with detailed logging
- *   - Onload: stores metadata in users/{userId}/files/{fileId} AND files/{fileId}
- *   - Updates user storageUsedBytes in Firestore
- *   - Dismisses progress popup immediately and calls refreshFileList()
+ *   - Direct Upload via XMLHttpRequest to: https://api.cloudinary.com/v1_1/${CLOUD_NAME}/auto/upload
+ *   - Attach FormData: file, upload_preset
+ *   - Track upload percentage in real-time and update UI progress bar
+ *   - On HTTP 200 response:
+ *       Extract secure_url and public_id
+ *       Save document to Firestore files collection AND user subcollection:
+ *       {
+ *         fileName: fileObj.name,
+ *         fileSize: fileObj.size,
+ *         fileType: fileObj.type,
+ *         fileUrl: resultData.secure_url,
+ *         cloudinaryPublicId: resultData.public_id,
+ *         uploadedAt: firebase.firestore.FieldValue.serverTimestamp(),
+ *         userUid: firebase.auth().currentUser ? firebase.auth().currentUser.uid : "anonymous",
+ *         userName: firebase.auth().currentUser ? firebase.auth().currentUser.displayName : "Guest User"
+ *       }
+ *   - IN ALL CASES (success or error), close/reset upload progress modal inside finally block
  */
-function uploadFileToCloudinary(file, onProgress) {
+function uploadFileToCloudinary(fileObj, onProgress) {
   return new Promise((resolve, reject) => {
-    // 1. Ensure Firebase Authentication status is checked before any upload
-    const currentUser = auth.currentUser || getCurrentUser();
-    if (!currentUser) {
-      const authErr = new Error("Please sign in to upload files.");
-      console.error("[Zulora Upload] Authentication required:", authErr);
-      return reject(authErr);
-    }
+    try {
+      // 1. Initialize Firebase Auth and Firestore if not already initialized
+      const currentUser = (firebase.auth && typeof firebase.auth === 'function' && firebase.auth().currentUser)
+        ? firebase.auth().currentUser
+        : (auth.currentUser || getCurrentUser());
 
-    // 2. Get current user's UID and email
-    const userUid   = currentUser.uid;
-    const userEmail = currentUser.email || '';
-
-    // 3. Construct FormData
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
-    formData.append('folder', `zulora_drive/users/${currentUser.uid}`);
-
-    // 4. Use XMLHttpRequest to perform the upload and track progress
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', CLOUDINARY_API_ENDPOINT, true);
-    xhr.timeout = 180000; // 3 minute timeout for large files
-
-    // Initial progress indicator (prevents 0% freeze visual)
-    xhr.upload.onloadstart = () => {
-      if (typeof onProgress === 'function') onProgress(5, 'Starting...');
-      updateUIProgressBar(5, 'Starting...');
-    };
-
-    xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable && e.total > 0) {
-        const percent = Math.min(99, Math.round((e.loaded / e.total) * 100));
-        if (typeof onProgress === 'function') onProgress(percent, `${percent}%`);
-        updateUIProgressBar(percent, `${percent}%`);
-      } else {
-        if (typeof onProgress === 'function') onProgress(50, 'Uploading...');
-        updateUIProgressBar(50, 'Uploading...');
+      if (!currentUser) {
+        const authErr = new Error("Please sign in to upload files.");
+        console.error("[Zulora Upload] Authentication required:", authErr);
+        return reject(authErr);
       }
-    };
 
-    xhr.upload.onload = () => {
-      if (typeof onProgress === 'function') onProgress(100, 'Saving...');
-      updateUIProgressBar(100, 'Saving...');
-    };
+      // 2. Direct Upload via XMLHttpRequest to Cloudinary API endpoint
+      const uploadUrl = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/auto/upload`;
 
-    xhr.onload = async () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        try {
-          const response = JSON.parse(xhr.responseText);
-          const fileId = doc(collection(db, 'files')).id;
+      // 3. Attach FormData: file and upload_preset
+      const formData = new FormData();
+      formData.append('file', fileObj);
+      formData.append('upload_preset', UPLOAD_PRESET);
+      formData.append('folder', `zulora_drive/users/${currentUser.uid}`);
 
-          const fileMetadata = {
-            fileName:           file.name,
-            fileSize:           file.size,
-            fileType:           file.type || 'application/octet-stream',
-            fileUrl:            response.secure_url,
-            cloudinaryPublicId: response.public_id,
-            uploadedAt:         firebase.firestore.FieldValue.serverTimestamp(),
-            userUid:            currentUser.uid,
-            userEmail:          currentUser.email || '',
-            userName:           currentUser.displayName || (currentUser.email ? currentUser.email.split('@')[0] : 'User'),
-            // Compatible mirror fields for UI renderer & search
-            id:                 fileId,
-            name:               file.name,
-            originalName:       file.name,
-            type:               file.type || 'application/octet-stream',
-            mimetype:           file.type || 'application/octet-stream',
-            size:               file.size,
-            url:                response.secure_url,
-            isStarred:          false,
-            isTrash:            false,
-            createdAt:          firebase.firestore.FieldValue.serverTimestamp(),
-            updatedAt:          firebase.firestore.FieldValue.serverTimestamp()
-          };
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', uploadUrl, true);
+      xhr.timeout = 180000; // 3-minute timeout for large files
 
-          // Save metadata document inside users/{userId}/files/{fileId} AND files/{fileId}
-          await Promise.all([
-            setDoc(doc(db, 'users', currentUser.uid, 'files', fileId), fileMetadata),
-            setDoc(doc(db, 'files', fileId), fileMetadata)
-          ]);
+      // 4. Track upload percentage in real-time and update UI progress bar
+      xhr.upload.onloadstart = () => {
+        if (typeof onProgress === 'function') onProgress(5, 'Starting...');
+        updateUIProgressBar(5, 'Starting...');
+      };
 
-          // Update user's storageUsedBytes in Firestore
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable && e.total > 0) {
+          const percent = Math.min(99, Math.round((e.loaded / e.total) * 100));
+          if (typeof onProgress === 'function') onProgress(percent, `${percent}%`);
+          updateUIProgressBar(percent, `${percent}%`);
+        } else {
+          if (typeof onProgress === 'function') onProgress(50, 'Uploading...');
+          updateUIProgressBar(50, 'Uploading...');
+        }
+      };
+
+      xhr.upload.onload = () => {
+        if (typeof onProgress === 'function') onProgress(100, 'Saving...');
+        updateUIProgressBar(100, 'Saving...');
+      };
+
+      // 5. On HTTP 200 response:
+      xhr.onload = async () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
           try {
-            await updateDoc(doc(db, 'users', currentUser.uid), {
-              storageUsedBytes: increment(file.size),
-              usedStorageBytes: increment(file.size),
-              storageUsed:      increment(file.size),
-              updatedAt:        serverTimestamp()
-            });
-          } catch (qErr) {
-            console.warn('[Zulora] Quota increment notice:', qErr.message);
+            const resultData = JSON.parse(xhr.responseText);
+            const fileId = doc(collection(db, 'files')).id;
+
+            const fileMetadata = {
+              fileName:           fileObj.name,
+              fileSize:           fileObj.size,
+              fileType:           fileObj.type || 'application/octet-stream',
+              fileUrl:            resultData.secure_url,
+              cloudinaryPublicId: resultData.public_id,
+              uploadedAt:         (firebase.firestore && firebase.firestore.FieldValue)
+                ? firebase.firestore.FieldValue.serverTimestamp()
+                : serverTimestamp(),
+              userUid:            (firebase.auth && typeof firebase.auth === 'function' && firebase.auth().currentUser)
+                ? firebase.auth().currentUser.uid
+                : (currentUser ? currentUser.uid : "anonymous"),
+              userName:           (firebase.auth && typeof firebase.auth === 'function' && firebase.auth().currentUser)
+                ? (firebase.auth().currentUser.displayName || currentUser?.displayName || (currentUser?.email ? currentUser.email.split('@')[0] : "User"))
+                : (currentUser?.displayName || "Guest User"),
+              // Dual-write mirror fields for UI renderer & search
+              id:                 fileId,
+              name:               fileObj.name,
+              originalName:       fileObj.name,
+              type:               fileObj.type || 'application/octet-stream',
+              mimetype:           fileObj.type || 'application/octet-stream',
+              size:               fileObj.size,
+              url:                resultData.secure_url,
+              isStarred:          false,
+              isTrash:            false,
+              createdAt:          serverTimestamp(),
+              updatedAt:          serverTimestamp()
+            };
+
+            // Save document to Firestore files collection AND users/{userId}/files/{fileId}
+            await Promise.all([
+              setDoc(doc(db, 'files', fileId), fileMetadata),
+              setDoc(doc(db, 'users', currentUser.uid, 'files', fileId), fileMetadata)
+            ]);
+
+            // Update user's storageUsedBytes in Firestore
+            try {
+              await updateDoc(doc(db, 'users', currentUser.uid), {
+                storageUsedBytes: increment(fileObj.size),
+                usedStorageBytes: increment(fileObj.size),
+                storageUsed:      increment(fileObj.size),
+                updatedAt:        serverTimestamp()
+              });
+            } catch (qErr) {
+              console.warn('[Zulora] Quota increment notice:', qErr.message);
+            }
+
+            resolve(resultData);
+          } catch (dbErr) {
+            console.warn("[Zulora Upload] Firestore save notice:", dbErr);
+            try {
+              resolve(JSON.parse(xhr.responseText));
+            } catch (_) {
+              resolve({});
+            }
           }
-
-          // Smooth fallback: dismiss progress popup immediately and trigger refreshFileList()
-          dismissProgressPopup();
-          refreshFileList();
-          resolve(response);
-        } catch (dbErr) {
-          console.warn("[Zulora Upload] Firestore metadata save notice:", dbErr);
-          dismissProgressPopup();
-          refreshFileList();
-          resolve(response);
-        }
-      } else {
-        let errMsg = `Upload failed (HTTP ${xhr.status})`;
-        try {
-          const errObj = JSON.parse(xhr.responseText);
-          if (errObj.error && errObj.error.message) {
-            errMsg = errObj.error.message;
+        } else {
+          let errMsg = `Upload failed (HTTP ${xhr.status})`;
+          try {
+            const errObj = JSON.parse(xhr.responseText);
+            if (errObj.error && errObj.error.message) errMsg = errObj.error.message;
+          } catch (_) {
+            if (xhr.statusText) errMsg = xhr.statusText;
           }
-        } catch (_) {
-          if (xhr.statusText) errMsg = xhr.statusText;
+          console.error("[Zulora Cloudinary Error]:", errMsg, xhr.responseText);
+          reject(new Error(errMsg));
         }
-        console.error("[Zulora Cloudinary Error]:", errMsg, xhr.responseText);
-        reject(new Error(errMsg));
-      }
-    };
+      };
 
-    xhr.onerror = () => {
-      const netErr = new Error("Network/CORS error uploading to Cloudinary.");
-      console.error("[Zulora Upload Network Error]:", netErr);
-      reject(netErr);
-    };
+      xhr.onerror = () => {
+        const netErr = new Error("Network/CORS error uploading to Cloudinary.");
+        console.error("[Zulora Upload Network Error]:", netErr);
+        reject(netErr);
+      };
 
-    xhr.ontimeout = () => {
-      const timeoutErr = new Error("Upload timed out. Please check your internet connection.");
-      console.error("[Zulora Upload Timeout]:", timeoutErr);
-      reject(timeoutErr);
-    };
+      xhr.ontimeout = () => {
+        const timeoutErr = new Error("Upload timed out. Please check your internet connection.");
+        console.error("[Zulora Upload Timeout]:", timeoutErr);
+        reject(timeoutErr);
+      };
 
-    xhr.onabort = () => {
-      reject(new Error("Upload was cancelled."));
-    };
+      xhr.onabort = () => {
+        reject(new Error("Upload was cancelled."));
+      };
 
-    xhr.send(formData);
+      xhr.send(formData);
+    } catch (err) {
+      reject(err);
+    }
   });
 }
 
@@ -1217,95 +1259,106 @@ function uploadFileToCloudinary(file, onProgress) {
  * Batch upload pipeline with:
  *   - 500 MB per-file limit check (Starter plan)
  *   - Storage quota check before each upload
- *   - Live progress drawer with per-file bars
- *   - Smooth error fallback handling (dismiss immediately on finish and trigger refreshFileList)
+ *   - Real-time progress drawer with per-file status
+ *   - 6. IN ALL CASES (success or error), close/reset upload progress modal inside finally block
  */
 async function uploadFilesBatch(files) {
-  const user = auth.currentUser || getCurrentUser();
-  if (!user) { alert('Please sign in first!'); return; }
-  if (!uploadDrawer) return;
+  const user = (firebase.auth && typeof firebase.auth === 'function' && firebase.auth().currentUser)
+    ? firebase.auth().currentUser
+    : (auth.currentUser || getCurrentUser());
 
-  uploadDrawer.style.display = 'block';
-  uploadDrawer.classList.add('show');
+  if (!user) {
+    alert('Please sign in first!');
+    return;
+  }
+  if (!files || files.length === 0) return;
+
+  if (uploadDrawer) {
+    uploadDrawer.style.display = 'block';
+    uploadDrawer.classList.add('show');
+  }
   if (uploadDrawerStatus) {
     uploadDrawerStatus.innerHTML =
       '<i class="fa-solid fa-circle-notch fa-spin text-azure"></i> Uploading to Zulora Drive (Cloudinary)...';
   }
   if (uploadDrawerBody) uploadDrawerBody.innerHTML = '';
 
-  let hasErrors = false;
+  try {
+    for (const file of files) {
+      const limit = Number(profile?.storageLimitBytes || profile?.storageLimit || DEFAULT_STORAGE_BYTES);
+      const used  = Number(profile?.storageUsedBytes || profile?.usedStorageBytes || profile?.storageUsed || 0);
 
-  for (const file of files) {
-    const limit = Number(profile?.storageLimitBytes || profile?.storageLimit || DEFAULT_STORAGE_BYTES);
-    const used  = Number(profile?.storageUsedBytes || profile?.usedStorageBytes || profile?.storageUsed || 0);
+      // 500 MB single-file limit for Starter plan (10 GB default)
+      if (limit <= DEFAULT_STORAGE_BYTES && file.size > MAX_STARTER_FILE_BYTES) {
+        alert(`Single-file limit exceeded: Starter plan allows 500 MB per file. "${file.name}" is ${formatBytes(file.size)}. Upgrade to Storage Lite or Business Pro for larger files.`);
+        openPlansModal();
+        continue;
+      }
 
-    // 500 MB single-file limit for Starter plan (10 GB default)
-    if (limit <= DEFAULT_STORAGE_BYTES && file.size > MAX_STARTER_FILE_BYTES) {
-      alert(`Single-file limit exceeded: Starter plan allows 500 MB per file. "${file.name}" is ${formatBytes(file.size)}. Upgrade to Storage Lite or Business Pro for larger files.`);
-      openPlansModal();
-      continue;
-    }
+      if (used + file.size > limit) {
+        alert(`Storage quota exceeded: "${file.name}" requires ${formatBytes(file.size)}, but only ${formatBytes(Math.max(0, limit - used))} remains.`);
+        openPlansModal();
+        continue;
+      }
 
-    if (used + file.size > limit) {
-      alert(`Storage quota exceeded: "${file.name}" requires ${formatBytes(file.size)}, but only ${formatBytes(Math.max(0, limit - used))} remains.`);
-      openPlansModal();
-      continue;
-    }
+      const row = document.createElement('div');
+      row.className = 'upload-item-row';
+      row.innerHTML = `
+        <div class="upload-item-info">
+          <span class="upload-item-name" title="${escHtml(file.name)}">${escHtml(file.name)}</span>
+          <span class="upload-status-text" style="font-size:0.78rem;font-weight:600;color:var(--azure-primary);">0%</span>
+        </div>
+        <div class="upload-item-progress-track">
+          <div class="upload-item-progress-bar"></div>
+        </div>`;
+      uploadDrawerBody?.appendChild(row);
 
-    const row = document.createElement('div');
-    row.className = 'upload-item-row';
-    row.innerHTML = `
-      <div class="upload-item-info">
-        <span class="upload-item-name" title="${escHtml(file.name)}">${escHtml(file.name)}</span>
-        <span class="upload-status-text" style="font-size:0.78rem;font-weight:600;color:var(--azure-primary);">0%</span>
-      </div>
-      <div class="upload-item-progress-track">
-        <div class="upload-item-progress-bar"></div>
-      </div>`;
-    uploadDrawerBody.appendChild(row);
+      const bar    = row.querySelector('.upload-item-progress-bar');
+      const status = row.querySelector('.upload-status-text');
+      currentActiveProgressBar    = bar;
+      currentActiveProgressStatus = status;
 
-    const bar    = row.querySelector('.upload-item-progress-bar');
-    const status = row.querySelector('.upload-status-text');
-    currentActiveProgressBar    = bar;
-    currentActiveProgressStatus = status;
+      try {
+        await uploadFileToCloudinary(file, (progress, statusText) => {
+          if (bar) {
+            bar.style.width = `${progress}%`;
+            bar.style.background = 'linear-gradient(90deg, #0ea5e9, #38bdf8)';
+          }
+          if (status) {
+            status.textContent = statusText || `${progress}%`;
+            status.style.color = 'var(--azure-primary)';
+          }
+        });
 
-    try {
-      await uploadFileToCloudinary(file, (progress, statusText) => {
-        if (bar) {
-          bar.style.width = `${progress}%`;
-          bar.style.background = 'linear-gradient(90deg, #0ea5e9, #38bdf8)';
-        }
         if (status) {
-          status.textContent = statusText || `${progress}%`;
-          status.style.color = 'var(--azure-primary)';
+          status.innerHTML = '<i class="fa-solid fa-circle-check" style="color:#10b981;"></i> Done';
+          status.style.color = '#10b981';
         }
-      });
-
-      if (status) {
-        status.innerHTML = '<i class="fa-solid fa-circle-check" style="color:#10b981;"></i> Done';
-        status.style.color = '#10b981';
-      }
-      if (bar) {
-        bar.style.width = '100%';
-        bar.style.background = '#10b981';
-      }
-    } catch (err) {
-      console.error('[Zulora Upload] Upload failed for:', file.name, err);
-      hasErrors = true;
-      const friendlyMsg = err.message || 'Upload failed';
-      if (status) {
-        status.innerHTML = `<span style="color:#ef4444;font-size:0.75rem;font-weight:600;" title="${escHtml(friendlyMsg)}"><i class="fa-solid fa-circle-xmark"></i> ${escHtml(friendlyMsg.length > 28 ? friendlyMsg.substring(0, 26) + '...' : friendlyMsg)}</span>`;
-      }
-      if (bar) {
-        bar.style.width = '100%';
-        bar.style.background = '#ef4444'; // Red bar indicating failed state
+        if (bar) {
+          bar.style.width = '100%';
+          bar.style.background = '#10b981';
+        }
+      } catch (err) {
+        console.error('[Zulora Upload] Upload failed for:', file.name, err);
+        const friendlyMsg = err.message || 'Upload failed';
+        if (status) {
+          status.innerHTML = `<span style="color:#ef4444;font-size:0.75rem;font-weight:600;" title="${escHtml(friendlyMsg)}"><i class="fa-solid fa-circle-xmark"></i> ${escHtml(friendlyMsg.length > 28 ? friendlyMsg.substring(0, 26) + '...' : friendlyMsg)}</span>`;
+        }
+        if (bar) {
+          bar.style.width = '100%';
+          bar.style.background = '#ef4444'; // Red bar indicating failed state
+        }
       }
     }
+  } catch (batchErr) {
+    console.error('[Zulora Upload] Batch error:', batchErr);
+  } finally {
+    // 6. IN ALL CASES (success or error), close/reset upload progress modal inside a finally block so UI never freezes at 0%
+    setTimeout(() => {
+      dismissProgressPopup();
+    }, 800);
+    await refreshFileList();
   }
-
-  // Smooth fallback: dismiss progress popup immediately and refresh file list
-  dismissProgressPopup();
-  await refreshFileList();
 }
 
 closeUploadDrawerBtn?.addEventListener('click', () => {
@@ -1362,6 +1415,32 @@ document.querySelectorAll('.sidebar-nav .nav-item').forEach((item) => {
     applyFiltersAndRender();
     if (window.innerWidth <= 900) appSidebar?.classList.remove('open');
   });
+});
+
+// Mobile bottom navigation bar controls
+document.querySelectorAll('.mobile-nav-btn').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    const target = btn.dataset.mobileNav;
+    document.querySelectorAll('.mobile-nav-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    if (target === 'my-drive' || target === 'recent' || target === 'starred') {
+      currentNav = target;
+      currentCategory = 'all';
+      document.querySelectorAll('.filter-chip').forEach((c) => c.classList.remove('active'));
+      document.querySelector('.filter-chip[data-filter="all"]')?.classList.add('active');
+      if (currentViewTitle) {
+        currentViewTitle.textContent = target === 'my-drive' ? 'My Drive' : target === 'recent' ? 'Recent' : 'Starred';
+      }
+      applyFiltersAndRender();
+    } else if (target === 'storage') {
+      openPlansModal();
+    }
+  });
+});
+
+$('mobileBottomUploadBtn')?.addEventListener('click', () => {
+  fileUploadInput?.click();
 });
 
 // Sort dropdown
