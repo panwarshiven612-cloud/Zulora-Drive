@@ -76,24 +76,52 @@ export const db = getFirestore(firebaseApp);
 
 // Compat bridge for db.collection("users").doc(...).collection("files").add(...) and query chaining
 db.collection = function(colName) {
+  const rootColRef = collection(db, colName);
   return {
-    doc: function(docId) {
+    add: function(data) {
+      return addDoc(rootColRef, data);
+    },
+    get: function() {
+      return getDocs(rootColRef);
+    },
+    orderBy: function(field, dir = 'desc') {
+      const q = query(rootColRef, orderBy(field, dir));
       return {
+        onSnapshot: function(callback, errCallback) {
+          return onSnapshot(q, callback, errCallback);
+        },
+        get: function() {
+          return getDocs(q);
+        }
+      };
+    },
+    onSnapshot: function(callback, errCallback) {
+      return onSnapshot(rootColRef, callback, errCallback);
+    },
+    doc: function(docId) {
+      const rootDocRef = doc(db, colName, docId);
+      return {
+        get: function() { return getDoc(rootDocRef); },
+        set: function(data, options) { return setDoc(rootDocRef, data, options); },
+        update: function(data) { return updateDoc(rootDocRef, data); },
+        delete: function() { return deleteDoc(rootDocRef); },
         collection: function(subColName) {
-          const colRef = collection(db, colName, docId, subColName);
+          const subColRef = collection(db, colName, docId, subColName);
           return {
             add: function(data) {
-              return addDoc(colRef, data);
+              return addDoc(subColRef, data);
             },
             doc: function(fileDocId) {
               const fileDocRef = doc(db, colName, docId, subColName, fileDocId);
               return {
+                get: function() { return getDoc(fileDocRef); },
+                set: function(data, options) { return setDoc(fileDocRef, data, options); },
                 delete: function() { return deleteDoc(fileDocRef); },
                 update: function(data) { return updateDoc(fileDocRef, data); }
               };
             },
             orderBy: function(field, dir = 'desc') {
-              const q = query(colRef, orderBy(field, dir));
+              const q = query(subColRef, orderBy(field, dir));
               return {
                 onSnapshot: function(callback, errCallback) {
                   return onSnapshot(q, callback, errCallback);
@@ -104,10 +132,10 @@ db.collection = function(colName) {
               };
             },
             onSnapshot: function(callback, errCallback) {
-              return onSnapshot(colRef, callback, errCallback);
+              return onSnapshot(subColRef, callback, errCallback);
             },
             get: function() {
-              return getDocs(colRef);
+              return getDocs(subColRef);
             }
           };
         }

@@ -123,30 +123,43 @@ export function uploadFileToCloudinary(file, onProgress) {
 
     const xhr = new XMLHttpRequest();
     xhr.open('POST', CLOUDINARY_API_ENDPOINT, true);
+    xhr.timeout = 180000; // 3 minutes timeout
+
+    xhr.upload.onloadstart = () => {
+      if (typeof onProgress === 'function') onProgress(5, 'Starting...');
+    };
 
     xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable) {
-        const percent = Math.round((e.loaded / e.total) * 100);
-        if (typeof onProgress === 'function') onProgress(percent);
+      if (e.lengthComputable && e.total > 0) {
+        const percent = Math.min(99, Math.round((e.loaded / e.total) * 100));
+        if (typeof onProgress === 'function') onProgress(percent, `${percent}%`);
+      } else {
+        if (typeof onProgress === 'function') onProgress(50, 'Uploading...');
       }
     };
 
+    xhr.upload.onload = () => {
+      if (typeof onProgress === 'function') onProgress(100, 'Saving...');
+    };
+
     xhr.onload = async () => {
-      if (xhr.status === 200) {
+      if (xhr.status >= 200 && xhr.status < 300) {
         try {
           const response = JSON.parse(xhr.responseText);
 
-          // Store metadata in Firestore under strict user ownership
-          const fileDocRef = await db.collection("users").doc(activeUser.uid).collection("files").add({
+          const fileId = doc(collection(db, 'files')).id;
+          const fileMetadata = {
             fileName:           file.name,
-            fileType:           file.type || 'application/octet-stream',
             fileSize:           file.size,
+            fileType:           file.type || 'application/octet-stream',
             fileUrl:            response.secure_url,
             cloudinaryPublicId: response.public_id,
+            uploadedAt:         firebase.firestore.FieldValue.serverTimestamp(),
             userUid:            activeUser.uid,
             userEmail:          activeUser.email || '',
-            createdAt:          firebase.firestore.FieldValue.serverTimestamp(),
+            userName:           activeUser.displayName || (activeUser.email ? activeUser.email.split('@')[0] : 'User'),
             // Compatible mirror fields for UI renderer
+            id:                 fileId,
             name:               file.name,
             originalName:       file.name,
             type:               file.type || 'application/octet-stream',
@@ -155,13 +168,20 @@ export function uploadFileToCloudinary(file, onProgress) {
             url:                response.secure_url,
             isStarred:          false,
             isTrash:            false,
-            uploadedAt:         firebase.firestore.FieldValue.serverTimestamp(),
+            createdAt:          firebase.firestore.FieldValue.serverTimestamp(),
             updatedAt:          firebase.firestore.FieldValue.serverTimestamp()
-          });
+          };
+
+          // Store metadata in both users/{userId}/files/{fileId} AND files/{fileId}
+          await Promise.all([
+            setDoc(doc(db, 'users', activeUser.uid, 'files', fileId), fileMetadata),
+            setDoc(doc(db, 'files', fileId), fileMetadata)
+          ]);
 
           // Increment user quota counters in Firestore
           try {
             await updateDoc(doc(db, 'users', activeUser.uid), {
+              storageUsedBytes: increment(file.size),
               usedStorageBytes: increment(file.size),
               storageUsed:      increment(file.size),
               updatedAt:        serverTimestamp()
@@ -171,7 +191,7 @@ export function uploadFileToCloudinary(file, onProgress) {
           }
 
           resolve({
-            id:                 fileDocRef.id,
+            id:                 fileId,
             fileName:           file.name,
             fileType:           file.type,
             fileSize:           file.size,
@@ -189,14 +209,26 @@ export function uploadFileToCloudinary(file, onProgress) {
           reject(dbErr);
         }
       } else {
-        console.error('Upload error:', xhr.responseText);
-        reject(new Error(xhr.responseText || 'Upload failed'));
+        let errMsg = `Upload failed (HTTP ${xhr.status})`;
+        try {
+          const errObj = JSON.parse(xhr.responseText);
+          if (errObj.error && errObj.error.message) errMsg = errObj.error.message;
+        } catch (_) {
+          if (xhr.statusText) errMsg = xhr.statusText;
+        }
+        console.error('Upload error:', errMsg, xhr.responseText);
+        reject(new Error(errMsg));
       }
     };
 
     xhr.onerror = () => {
-      console.error('Network error during Cloudinary upload');
-      reject(new Error('Network error during upload'));
+      console.error('Network/CORS error during Cloudinary upload');
+      reject(new Error('Network/CORS error uploading to Cloudinary'));
+    };
+
+    xhr.ontimeout = () => {
+      console.error('Timeout during Cloudinary upload');
+      reject(new Error('Upload timed out. Check your connection.'));
     };
 
     xhr.send(formData);
@@ -228,24 +260,54 @@ export async function bootstrapUser() {
       const accountId   = deriveAccountId(user);
       const referrerUid = getReferrerUidFromUrl();
 
+      // Calculate storageUsedBytes from sum of all uploaded file sizes
+      let storageUsedBytes = 0;
+      try {
+        const filesSnap = await getDocs(collection(db, 'users', user.uid, 'files'));
+        filesSnap.forEach((docSnap) => {
+          const d = docSnap.data();
+          storageUsedBytes += Number(d.fileSize ?? d.size ?? 0);
+        });
+      } catch (sumErr) {
+        console.warn('[Zulora] Storage sum calculation notice:', sumErr.message);
+      }
+
       if (userSnap && userSnap.exists()) {
         const d = userSnap.data();
-        currentProfile = buildProfile(user, d);
+        const updatedData = {
+          name:             displayName,
+          displayName:      displayName,
+          email,
+          photoURL:         user.photoURL || '',
+          uid:              user.uid,
+          lastLogin:        serverTimestamp(),
+          storageUsedBytes: storageUsedBytes,
+          usedStorageBytes: storageUsedBytes,
+          storageUsed:      storageUsedBytes,
+          updatedAt:        serverTimestamp()
+        };
+        await setDoc(userRef, updatedData, { merge: true }).catch((err) =>
+          console.warn('[Zulora] User update notice:', err.message)
+        );
+        currentProfile = buildProfile(user, { ...d, ...updatedData });
         return currentProfile;
       }
 
       // First sign-in: create profile document
       const newProfileData = {
+        name:               displayName,
         uid:                user.uid,
         email,
         displayName,
         username,
         accountId,
         photoURL:           user.photoURL || '',
+        lastLogin:          serverTimestamp(),
+        storageUsedBytes:   storageUsedBytes,
         storageLimitBytes:  DEFAULT_STORAGE_BYTES,   // 10 GB
-        usedStorageBytes:   0,
+        usedStorageBytes:   storageUsedBytes,
         storageLimit:       DEFAULT_STORAGE_BYTES,
-        storageUsed:        0,
+        storageUsed:        storageUsedBytes,
         planType:           'Starter',
         tier:               'free',
         totalReferrals:     0,
@@ -287,17 +349,21 @@ export async function bootstrapUser() {
 /** Build a normalized profile object from Firestore data */
 function buildProfile(user, d) {
   const email = user.email || d.email || '';
+  const displayName = d.name || d.displayName || user.displayName || email.split('@')[0] || 'User';
+  const storageUsed = Number(d.storageUsedBytes ?? d.usedStorageBytes ?? d.storageUsed ?? 0);
   return {
     uid:                user.uid,
+    name:               displayName,
     email,
-    displayName:        d.displayName || user.displayName || email.split('@')[0],
+    displayName:        displayName,
     username:           d.username    || deriveUsername(user),
     accountId:          d.accountId   || deriveAccountId(user),
     photoURL:           d.photoURL    || user.photoURL || '',
+    storageUsedBytes:   storageUsed,
     storageLimitBytes:  Number(d.storageLimitBytes || d.storageLimit || DEFAULT_STORAGE_BYTES),
-    usedStorageBytes:   Number(d.usedStorageBytes  || d.storageUsed  || 0),
+    usedStorageBytes:   storageUsed,
     storageLimit:       Number(d.storageLimitBytes || d.storageLimit || DEFAULT_STORAGE_BYTES),
-    storageUsed:        Number(d.usedStorageBytes  || d.storageUsed  || 0),
+    storageUsed:        storageUsed,
     planType:           d.planType || 'Starter',
     tier:               d.tier     || 'free',
     totalReferrals:     Number(d.totalReferrals     || 0),

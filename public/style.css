@@ -1078,12 +1078,90 @@ a {
 }
 
 /* ==========================================
-   TERABOX STYLE FILES GRID VIEW
+   CATEGORISED FILE SECTIONS & GRID
    ========================================== */
 .files-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+  width: 100%;
+}
+
+.file-category-section {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.file-category-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.file-category-title-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.file-category-title-group i {
+  font-size: 1.15rem;
+}
+
+.file-category-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-main);
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+.file-category-count-badge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--bg-subtle);
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+}
+
+.file-category-size {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.category-file-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(215px, 1fr));
   gap: 16px;
+  width: 100%;
+}
+
+.category-header-row td {
+  background: var(--bg-subtle) !important;
+  padding: 10px 18px !important;
+  border-top: 1px solid var(--border-soft);
+  border-bottom: 1px solid var(--border-soft);
+  font-weight: 700;
+}
+
+.category-header-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.category-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-main);
+  font-size: 0.92rem;
 }
 
 .file-card {
