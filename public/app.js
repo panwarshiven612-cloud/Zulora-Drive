@@ -1398,12 +1398,14 @@ function uploadFileToCloudinary(fileObj, onProgress) {
 
       const xhr = new XMLHttpRequest();
       xhr.open('POST', uploadUrl, true);
-      xhr.timeout = 180000; // 3-minute timeout for large files
+      xhr.timeout = 20000; // 20-second timeout handling
 
-      // 4. Track upload percentage in real-time and update UI progress bar
+      // 4. Track upload percentage in real-time and update UI progress bar & #uploadProgress
       xhr.upload.onloadstart = () => {
         if (typeof onProgress === 'function') onProgress(5, 'Starting...');
         updateUIProgressBar(5, 'Starting...');
+        const pEl = $('uploadProgress');
+        if (pEl) pEl.textContent = '5%';
       };
 
       xhr.upload.onprogress = (e) => {
@@ -1411,15 +1413,26 @@ function uploadFileToCloudinary(fileObj, onProgress) {
           const percent = Math.min(99, Math.round((e.loaded / e.total) * 100));
           if (typeof onProgress === 'function') onProgress(percent, `${percent}%`);
           updateUIProgressBar(percent, `${percent}%`);
+          const pEl = $('uploadProgress');
+          if (pEl) pEl.textContent = `${percent}%`;
         } else {
           if (typeof onProgress === 'function') onProgress(50, 'Uploading...');
           updateUIProgressBar(50, 'Uploading...');
+          const pEl = $('uploadProgress');
+          if (pEl) pEl.textContent = '50%';
         }
       };
 
       xhr.upload.onload = () => {
         if (typeof onProgress === 'function') onProgress(100, 'Saving...');
         updateUIProgressBar(100, 'Saving...');
+        const pEl = $('uploadProgress');
+        if (pEl) pEl.textContent = '100%';
+      };
+
+      xhr.onloadend = () => {
+        const pEl = $('uploadProgress');
+        if (pEl) pEl.textContent = '100%';
       };
 
       // 5. On HTTP 200 response:
@@ -1495,6 +1508,7 @@ function uploadFileToCloudinary(fileObj, onProgress) {
             if (xhr.statusText) errMsg = xhr.statusText;
           }
           console.error("[Zulora Cloudinary Error]:", errMsg, xhr.responseText);
+          showToast(errMsg, true);
           reject(new Error(errMsg));
         }
       };
@@ -1502,12 +1516,14 @@ function uploadFileToCloudinary(fileObj, onProgress) {
       xhr.onerror = () => {
         const netErr = new Error("Network/CORS error uploading to Cloudinary.");
         console.error("[Zulora Upload Network Error]:", netErr);
+        showToast(netErr.message, true);
         reject(netErr);
       };
 
       xhr.ontimeout = () => {
-        const timeoutErr = new Error("Upload timed out. Please check your internet connection.");
+        const timeoutErr = new Error("Upload timed out (20s limit). Please check your internet connection.");
         console.error("[Zulora Upload Timeout]:", timeoutErr);
+        showToast(timeoutErr.message, true);
         reject(timeoutErr);
       };
 
@@ -1517,6 +1533,7 @@ function uploadFileToCloudinary(fileObj, onProgress) {
 
       xhr.send(formData);
     } catch (err) {
+      showToast(err.message || "Upload error occurred.", true);
       reject(err);
     }
   });
