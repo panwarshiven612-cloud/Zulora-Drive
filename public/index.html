@@ -38,6 +38,11 @@
       </div>
 
       <div class="header-right">
+        <button id="headerUploadBtn" class="header-action-btn btn-upload-header" title="Upload Files">
+          <i class="fa-solid fa-cloud-arrow-up"></i>
+          <span>Upload File</span>
+        </button>
+
         <a href="https://wa.me/916395211325?text=Hello%20Zulora%20Support" target="_blank" class="header-action-btn btn-whatsapp-header" title="WhatsApp Support">
           <i class="fa-brands fa-whatsapp"></i>
           <span>Support</span>
@@ -131,7 +136,11 @@
           </button>
           <button class="nav-item" data-nav="trash">
             <i class="fa-regular fa-trash-can"></i>
-            <span>Trash</span>
+            <span>Trash / Recycle Bin</span>
+          </button>
+          <button id="sidebarAdminBtn" class="nav-item admin-nav-item" data-nav="admin" style="display: none;">
+            <i class="fa-solid fa-user-shield"></i>
+            <span>Admin Overview</span>
           </button>
 
           <div class="nav-section-label" style="margin-top: 10px;">CATEGORIES</div>
@@ -268,6 +277,20 @@
 
         <!-- WORKSPACE AREA -->
         <div id="mainWorkspace" class="main-workspace">
+          <!-- TRASH / RECYCLE BIN ACTION BANNER -->
+          <div id="trashToolbarBanner" class="trash-toolbar-banner" style="display: none;">
+            <div class="trash-banner-left">
+              <i class="fa-solid fa-trash-can"></i>
+              <span>Items in Trash / Recycle Bin can be restored or permanently deleted.</span>
+            </div>
+            <div class="trash-banner-actions">
+              <button id="emptyTrashBtn" class="btn btn-danger-soft btn-sm" title="Permanently delete all items in trash">
+                <i class="fa-solid fa-fire"></i>
+                <span>Empty Trash</span>
+              </button>
+            </div>
+          </div>
+
           <!-- DRAG & DROP OVERLAY -->
           <div id="dropzoneOverlay" class="dropzone-overlay">
             <div class="dropzone-box">
@@ -332,6 +355,9 @@
     <button class="context-item" data-action="download">
       <i class="fa-solid fa-download"></i> Download
     </button>
+    <button class="context-item" data-action="copy-link">
+      <i class="fa-solid fa-link"></i> Copy Link
+    </button>
     <button class="context-item" data-action="star">
       <i class="fa-regular fa-star"></i> Toggle Star
     </button>
@@ -339,8 +365,8 @@
       <i class="fa-regular fa-pen-to-square"></i> Rename
     </button>
     <div class="context-divider"></div>
-    <button class="context-item danger" data-action="delete">
-      <i class="fa-regular fa-trash-can"></i> Delete
+    <button class="context-item danger" data-action="trash">
+      <i class="fa-regular fa-trash-can"></i> Move to Trash
     </button>
   </div>
 
@@ -623,6 +649,9 @@
       <span id="mobileStoragePercent">0%</span>
     </button>
   </nav>
+
+  <!-- FLOATING TOAST NOTIFICATION -->
+  <div id="toastNotification" class="toast-notification"></div>
 
   <!-- PRIMARY APP SCRIPT -->
   <script type="module" src="app.js"></script>

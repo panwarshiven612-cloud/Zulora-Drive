@@ -148,6 +148,7 @@ export function uploadFileToCloudinary(file, onProgress) {
           const response = JSON.parse(xhr.responseText);
 
           const fileId = doc(collection(db, 'files')).id;
+          const userUid = activeUser ? activeUser.uid : "guest";
           const fileMetadata = {
             fileName:           file.name,
             fileSize:           file.size,
@@ -155,10 +156,9 @@ export function uploadFileToCloudinary(file, onProgress) {
             fileUrl:            response.secure_url,
             cloudinaryPublicId: response.public_id,
             uploadedAt:         firebase.firestore.FieldValue.serverTimestamp(),
-            userUid:            activeUser.uid,
-            userEmail:          activeUser.email || '',
-            userName:           activeUser.displayName || (activeUser.email ? activeUser.email.split('@')[0] : 'User'),
-            // Compatible mirror fields for UI renderer
+            userUid:            userUid,
+            isTrashed:          false,
+            // Compatible mirror fields for UI renderer & queries
             id:                 fileId,
             name:               file.name,
             originalName:       file.name,
@@ -166,6 +166,8 @@ export function uploadFileToCloudinary(file, onProgress) {
             mimetype:           file.type || 'application/octet-stream',
             size:               file.size,
             url:                response.secure_url,
+            userEmail:          activeUser?.email || '',
+            userName:           activeUser?.displayName || (activeUser?.email ? activeUser.email.split('@')[0] : 'User'),
             isStarred:          false,
             isTrash:            false,
             createdAt:          firebase.firestore.FieldValue.serverTimestamp(),

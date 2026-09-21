@@ -115,7 +115,9 @@ const dropdownPlanBadge   = $('dropdownPlanBadge');
 const dropdownUpgradeBtn  = $('dropdownUpgradeBtn');
 const openPlansModalBtn   = $('openPlansModalBtn');
 const headerUpgradeBtn    = $('headerUpgradeBtn');
+const headerUploadBtn     = $('headerUploadBtn');
 const sidebarUpgradeBtn   = $('sidebarUpgradeBtn');
+const sidebarAdminBtn     = $('sidebarAdminBtn');
 const bannerUpgradeBtn    = $('bannerUpgradeBtn');
 const adminDashboardBtn   = $('adminDashboardBtn');
 const logoutBtn           = $('logoutBtn');
@@ -132,6 +134,8 @@ const segOther            = $('segOther');
 const storageUsageDetails = $('storageUsageDetails');
 const quotaWarningBanner  = $('quotaWarningBanner');
 const quotaWarningText    = $('quotaWarningText');
+const trashToolbarBanner  = $('trashToolbarBanner');
+const emptyTrashBtn       = $('emptyTrashBtn');
 const mainWorkspace       = $('mainWorkspace');
 const dropzoneOverlay     = $('dropzoneOverlay');
 const currentViewTitle    = $('currentViewTitle');
@@ -177,10 +181,41 @@ const adminTotalFiles     = $('adminTotalFiles');
 const adminTotalStorage   = $('adminTotalStorage');
 const adminUsersTableBody = $('adminUsersTableBody');
 const fileContextMenu     = $('fileContextMenu');
+const toastNotification   = $('toastNotification');
 
 // ══════════════════════════════════════════════════════════════════════════════
-// FORMATTING HELPERS
+// FORMATTING HELPERS & NOTIFICATIONS
 // ══════════════════════════════════════════════════════════════════════════════
+let toastTimeoutId = null;
+export function showToast(message, isError = false) {
+  const toast = $('toastNotification');
+  if (!toast) return;
+  toast.textContent = message;
+  toast.className = 'toast-notification show' + (isError ? ' error' : '');
+  clearTimeout(toastTimeoutId);
+  toastTimeoutId = setTimeout(() => {
+    toast.className = 'toast-notification';
+  }, 3000);
+}
+
+/**
+ * Dynamic size formatting per specification:
+ * - display in KB if under 1 MB
+ * - display in MB if under 1 GB
+ * - display in GB if 1 GB or larger (e.g., "450 KB / 15 GB" or "12.4 MB / 15 GB")
+ */
+export function formatStorageSize(bytes) {
+  const b = Math.max(0, Number(bytes || 0));
+  if (b === 0) return '0 KB';
+  if (b < 1024 * 1024) {
+    return `${parseFloat((b / 1024).toFixed(1))} KB`;
+  } else if (b < 1024 * 1024 * 1024) {
+    return `${parseFloat((b / (1024 * 1024)).toFixed(1))} MB`;
+  } else {
+    return `${parseFloat((b / (1024 * 1024 * 1024)).toFixed(2))} GB`;
+  }
+}
+
 function formatBytes(bytes, decimals = 1) {
   if (!bytes || bytes === 0) return '0 B';
   const k     = 1024;
@@ -228,15 +263,22 @@ function getFileIconMeta(mime, filename = '') {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// REAL-TIME STORAGE USAGE METER
+// REAL-TIME STORAGE USAGE METER (Calculated across active files where isTrashed: false)
 // ══════════════════════════════════════════════════════════════════════════════
+function calculateActiveStorage() {
+  return allFiles
+    .filter(f => !f.isTrashed && !f.isTrash)
+    .reduce((sum, f) => sum + Number(f.fileSize || f.size || 0), 0);
+}
+
 function updateStorageUI(p) {
   if (!p) return;
   profile = p;
 
-  const used    = Number(p.storageUsedBytes ?? p.usedStorageBytes ?? p.storageUsed ?? 0);
-  const limit   = Number(p.storageLimitBytes || p.storageLimit || DEFAULT_STORAGE_BYTES);
-  const percent = limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : 0;
+  // Active storage used across non-trashed files
+  const activeUsed = calculateActiveStorage();
+  const limit      = Number(p.storageLimitBytes || p.storageLimit || DEFAULT_STORAGE_BYTES);
+  const percent    = limit > 0 ? Math.min(100, Math.round((activeUsed / limit) * 100)) : 0;
 
   if (storagePercentText) storagePercentText.textContent = `${percent}%`;
   const mobileStoragePercent = $('mobileStoragePercent');
@@ -251,9 +293,9 @@ function updateStorageUI(p) {
         : 'linear-gradient(90deg, #0ea5e9, #38bdf8)';
   }
 
-  // Segmented category bar
+  // Segmented category bar (across active files only)
   let photoBytes = 0, docBytes = 0, mediaBytes = 0, audioBytes = 0, otherBytes = 0;
-  allFiles.forEach((f) => {
+  allFiles.filter(f => !f.isTrashed && !f.isTrash).forEach((f) => {
     const sz  = Number(f.size || f.fileSize || 0);
     const cat = getFileCategory(f.mimetype || f.type || f.fileType, f.name || f.fileName);
     if      (cat === 'images')    photoBytes += sz;
@@ -272,12 +314,12 @@ function updateStorageUI(p) {
 
   // Quota warning banner
   if (quotaWarningBanner) {
-    if (percent >= 90) {
+    if (percent >= 90 && currentNav !== 'trash') {
       quotaWarningBanner.className = 'storage-banner danger';
       if (quotaWarningText) quotaWarningText.textContent =
         `Critical: ${percent}% of your allocated cloud space is full. Upgrade now.`;
       quotaWarningBanner.style.display = 'flex';
-    } else if (percent >= 75) {
+    } else if (percent >= 75 && currentNav !== 'trash') {
       quotaWarningBanner.className = 'storage-banner warning';
       if (quotaWarningText) quotaWarningText.textContent =
         `Notice: You have used ${percent}% of your cloud storage.`;
@@ -287,14 +329,15 @@ function updateStorageUI(p) {
     }
   }
 
+  // Dynamic KB / MB / GB formatting
   if (storageUsageDetails) {
-    storageUsageDetails.innerHTML = `<b>${formatBytes(used)}</b> / ${formatBytes(limit, 0)} used`;
+    storageUsageDetails.innerHTML = `<b>${formatStorageSize(activeUsed)}</b> / ${formatStorageSize(limit)} used`;
   }
 
   const isAdminUser = isAdmin(p);
   const tierName    = isAdminUser ? 'Admin' : (p.planType || (limit > DEFAULT_STORAGE_BYTES ? 'Pro' : 'Starter'));
   if (dropdownPlanBadge) {
-    dropdownPlanBadge.textContent = `${tierName} · ${formatBytes(limit, 0)}`;
+    dropdownPlanBadge.textContent = `${tierName} · ${formatStorageSize(limit)}`;
     if (isAdminUser) dropdownPlanBadge.classList.add('admin');
   }
 }
@@ -327,6 +370,7 @@ function setupUserUI(user, prof) {
   // Admin console button — only visible to zulora.help@gmail.com
   const adminVisible = isAdmin(prof) || email.toLowerCase() === ADMIN_EMAIL;
   if (adminDashboardBtn) adminDashboardBtn.style.display = adminVisible ? 'flex' : 'none';
+  if (sidebarAdminBtn)   sidebarAdminBtn.style.display   = adminVisible ? 'flex' : 'none';
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -413,18 +457,19 @@ function renderFileList(fileDocs) {
       userUid:            d.userUid || '',
       userEmail:          d.userEmail || '',
       isStarred:          Boolean(d.isStarred),
-      isTrash:            Boolean(d.isTrash),
+      isTrash:            Boolean(d.isTrash ?? d.isTrashed ?? false),
+      isTrashed:          Boolean(d.isTrashed ?? d.isTrash ?? false),
       uploadedAt:         iso,
       createdAt:          iso
     };
   });
 
-  // Dynamically calculate total storage used from sum of all uploaded file sizes
-  const totalStorage = allFiles.reduce((sum, f) => sum + Number(f.fileSize || f.size || 0), 0);
+  // Calculate total storage used across all active files (where isTrashed: false)
+  const activeStorage = calculateActiveStorage();
   if (profile) {
-    profile.storageUsedBytes = totalStorage;
-    profile.usedStorageBytes = totalStorage;
-    profile.storageUsed      = totalStorage;
+    profile.storageUsedBytes = activeStorage;
+    profile.usedStorageBytes = activeStorage;
+    profile.storageUsed      = activeStorage;
     updateStorageUI(profile);
   }
 
@@ -447,19 +492,22 @@ export async function refreshFileList() {
     const fileDocs = filesSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
     renderFileList(fileDocs);
 
-    // Sync calculated storage sum to user document
-    const totalStorage = fileDocs.reduce((acc, f) => acc + Number(f.fileSize || f.size || 0), 0);
+    // Sync calculated active storage sum to user document (only non-trashed files)
+    const activeStorage = fileDocs
+      .filter((f) => !f.isTrashed && !f.isTrash)
+      .reduce((acc, f) => acc + Number(f.fileSize || f.size || 0), 0);
+
     if (profile) {
-      profile.storageUsedBytes = totalStorage;
-      profile.usedStorageBytes = totalStorage;
-      profile.storageUsed      = totalStorage;
+      profile.storageUsedBytes = activeStorage;
+      profile.usedStorageBytes = activeStorage;
+      profile.storageUsed      = activeStorage;
       updateStorageUI(profile);
     }
 
     await updateDoc(doc(db, 'users', currentUser.uid), {
-      storageUsedBytes: totalStorage,
-      usedStorageBytes: totalStorage,
-      storageUsed:      totalStorage,
+      storageUsedBytes: activeStorage,
+      usedStorageBytes: activeStorage,
+      storageUsed:      activeStorage,
       updatedAt:        serverTimestamp()
     }).catch(() => {});
   } catch (err) {
@@ -489,19 +537,21 @@ async function loadUserFiles(uid) {
  *   - photoURL: currentUser.photoURL
  *   - uid: currentUser.uid
  *   - lastLogin: firebase.firestore.FieldValue.serverTimestamp()
- *   - storageUsedBytes: (Calculate from sum of all uploaded file sizes)
+ *   - storageUsedBytes: (Calculate from sum of all uploaded active file sizes where isTrashed: false)
  */
 export async function saveOrUpdateUserProfile(currentUser) {
   if (!currentUser?.uid) return null;
   const userRef = doc(db, 'users', currentUser.uid);
 
-  // 1. Calculate storageUsedBytes from sum of all uploaded file sizes
+  // 1. Calculate storageUsedBytes from sum of all uploaded active files (where isTrashed: false)
   let storageUsedBytes = 0;
   try {
     const filesSnap = await getDocs(collection(db, 'users', currentUser.uid, 'files'));
     filesSnap.forEach((docSnap) => {
       const d = docSnap.data();
-      storageUsedBytes += Number(d.fileSize ?? d.size ?? 0);
+      if (!d.isTrashed && !d.isTrash) {
+        storageUsedBytes += Number(d.fileSize ?? d.size ?? 0);
+      }
     });
   } catch (err) {
     console.warn('[Zulora] Storage sum calculation notice:', err.message);
@@ -602,9 +652,10 @@ function applyFiltersAndRender() {
   const query = (globalSearchInput?.value || '').trim().toLowerCase();
 
   filteredFiles = allFiles.filter((file) => {
-    if (currentNav === 'trash')   { if (!file.isTrash)  return false; }
-    else                          { if (file.isTrash)   return false; }
-    if (currentNav === 'starred' && !file.isStarred)     return false;
+    const isTrashed = Boolean(file.isTrashed || file.isTrash);
+    if (currentNav === 'trash')   { if (!isTrashed)  return false; }
+    else                          { if (isTrashed)   return false; }
+    if (currentNav === 'starred' && !file.isStarred) return false;
 
     if (currentCategory !== 'all') {
       if (getFileCategory(file.mimetype || file.type || file.fileType, file.name || file.fileName) !== currentCategory) return false;
@@ -645,6 +696,10 @@ function renderFilesView() {
   if (filesGrid)           filesGrid.style.display           = hasFiles && currentViewMode === 'grid' ? 'grid'  : 'none';
   if (filesListContainer)  filesListContainer.style.display  = hasFiles && currentViewMode === 'list' ? 'block' : 'none';
 
+  if (trashToolbarBanner) {
+    trashToolbarBanner.style.display = currentNav === 'trash' ? 'flex' : 'none';
+  }
+
   if (!hasFiles) {
     if (filesGrid)       filesGrid.innerHTML      = '';
     if (filesTableBody)  filesTableBody.innerHTML = '';
@@ -665,15 +720,16 @@ const CATEGORY_GROUPS = [
 ];
 
 function createFileCardElement(file) {
-  const meta  = getFileIconMeta(file.mimetype || file.type || file.fileType, file.name || file.fileName);
-  const isImg = getFileCategory(file.mimetype || file.type || file.fileType, file.name || file.fileName) === 'images';
-  const card  = document.createElement('div');
-  card.className      = 'file-card';
+  const meta     = getFileIconMeta(file.mimetype || file.type || file.fileType, file.name || file.fileName);
+  const isImg    = getFileCategory(file.mimetype || file.type || file.fileType, file.name || file.fileName) === 'images';
+  const card     = document.createElement('div');
+  card.className = 'file-card';
   card.dataset.fileId = file.id;
 
   const fName = file.fileName || file.name || 'Untitled File';
   const fUrl  = file.fileUrl  || file.url  || '';
   const fSize = Number(file.fileSize ?? file.size ?? 0);
+  const isTrashed = Boolean(file.isTrashed || file.isTrash);
 
   card.innerHTML = `
     <div class="file-card-preview-box">
@@ -684,36 +740,67 @@ function createFileCardElement(file) {
     <div class="file-card-actions">
       <span class="file-card-type-tag">${meta.label}</span>
       <div class="file-card-buttons">
-        <button class="star-btn${file.isStarred ? ' starred' : ''}" data-action="toggle-star"
-          title="${file.isStarred ? 'Unstar' : 'Star'}">
-          <i class="${file.isStarred ? 'fa-solid' : 'fa-regular'} fa-star"></i>
-        </button>
-        <button class="menu-btn" data-action="open-menu" title="More options">
-          <i class="fa-solid fa-ellipsis-vertical"></i>
-        </button>
+        ${isTrashed ? `
+          <button class="menu-btn" data-action="open-menu" title="More options">
+            <i class="fa-solid fa-ellipsis-vertical"></i>
+          </button>
+        ` : `
+          <button class="btn-action-icon" data-action="download" title="Download">
+            <i class="fa-solid fa-download"></i>
+          </button>
+          <button class="btn-action-icon" data-action="copy-link" title="Copy Link">
+            <i class="fa-solid fa-link"></i>
+          </button>
+          <button class="star-btn${file.isStarred ? ' starred' : ''}" data-action="toggle-star"
+            title="${file.isStarred ? 'Unstar' : 'Star'}">
+            <i class="${file.isStarred ? 'fa-solid' : 'fa-regular'} fa-star"></i>
+          </button>
+          <button class="btn-action-icon danger-hover" data-action="move-to-trash" title="Move to Trash">
+            <i class="fa-regular fa-trash-can"></i>
+          </button>
+          <button class="menu-btn" data-action="open-menu" title="More options">
+            <i class="fa-solid fa-ellipsis-vertical"></i>
+          </button>
+        `}
       </div>
     </div>
     <div class="file-card-info">
       <div class="file-card-title" title="${escHtml(fName)}">${escHtml(fName)}</div>
       <div class="file-card-meta">
-        <span>${formatBytes(fSize)}</span>
+        <span>${formatStorageSize(fSize)}</span>
         <span>${formatDate(file.uploadedAt || file.createdAt)}</span>
       </div>
-    </div>`;
+    </div>
+    ${isTrashed ? `
+      <div class="file-card-trash-actions">
+        <button class="btn-trash-pill restore" data-action="restore" title="Restore to My Drive">
+          <i class="fa-solid fa-rotate-left"></i> Restore
+        </button>
+        <button class="btn-trash-pill permanent-delete" data-action="permanent-delete" title="Permanently Delete">
+          <i class="fa-solid fa-trash"></i> Delete
+        </button>
+      </div>
+    ` : ''}`;
 
   card.addEventListener('click', (e) => { if (!e.target.closest('button')) openPreviewModal(file); });
   card.querySelector('[data-action="toggle-star"]')?.addEventListener('click', (e) => { e.stopPropagation(); toggleStar(file); });
+  card.querySelector('[data-action="download"]')?.addEventListener('click', (e) => { e.stopPropagation(); downloadFile(file); });
+  card.querySelector('[data-action="copy-link"]')?.addEventListener('click', (e) => { e.stopPropagation(); copyFileLink(file); });
+  card.querySelector('[data-action="move-to-trash"]')?.addEventListener('click', (e) => { e.stopPropagation(); moveToTrash(file); });
+  card.querySelector('[data-action="restore"]')?.addEventListener('click', (e) => { e.stopPropagation(); restoreFromTrash(file); });
+  card.querySelector('[data-action="permanent-delete"]')?.addEventListener('click', (e) => { e.stopPropagation(); openDeleteModal(file); });
   card.querySelector('[data-action="open-menu"]')?.addEventListener('click', (e) => { e.stopPropagation(); showContextMenu(e, file); });
 
   return card;
 }
 
 function createFileListRowElement(file) {
-  const meta  = getFileIconMeta(file.mimetype || file.type || file.fileType, file.name || file.fileName);
-  const tr    = document.createElement('tr');
+  const meta     = getFileIconMeta(file.mimetype || file.type || file.fileType, file.name || file.fileName);
+  const tr       = document.createElement('tr');
   tr.dataset.fileId = file.id;
-  const fName = file.fileName || file.name || 'Untitled File';
-  const fSize = Number(file.fileSize ?? file.size ?? 0);
+  const fName    = file.fileName || file.name || 'Untitled File';
+  const fSize    = Number(file.fileSize ?? file.size ?? 0);
+  const isTrashed = Boolean(file.isTrashed || file.isTrash);
 
   tr.innerHTML = `
     <td>
@@ -722,24 +809,39 @@ function createFileListRowElement(file) {
         <span title="${escHtml(fName)}">${escHtml(fName)}</span>
       </div>
     </td>
-    <td>${formatBytes(fSize)}</td>
+    <td>${formatStorageSize(fSize)}</td>
     <td>${formatDate(file.uploadedAt || file.createdAt)}</td>
     <td>
       <div class="table-actions">
-        <button class="star-btn${file.isStarred ? ' starred' : ''}" data-action="toggle-star" title="Star">
-          <i class="${file.isStarred ? 'fa-solid' : 'fa-regular'} fa-star"></i>
-        </button>
-        <button class="btn-icon" data-action="preview"  title="Preview"><i class="fa-regular fa-eye"></i></button>
-        <button class="btn-icon" data-action="download" title="Download"><i class="fa-solid fa-download"></i></button>
-        <button class="menu-btn" data-action="open-menu" title="More"><i class="fa-solid fa-ellipsis-vertical"></i></button>
+        ${isTrashed ? `
+          <button class="btn-trash-pill restore" data-action="restore" title="Restore to My Drive">
+            <i class="fa-solid fa-rotate-left"></i> Restore
+          </button>
+          <button class="btn-trash-pill permanent-delete" data-action="permanent-delete" title="Permanently Delete">
+            <i class="fa-solid fa-trash"></i> Delete
+          </button>
+        ` : `
+          <button class="star-btn${file.isStarred ? ' starred' : ''}" data-action="toggle-star" title="Star">
+            <i class="${file.isStarred ? 'fa-solid' : 'fa-regular'} fa-star"></i>
+          </button>
+          <button class="btn-icon" data-action="preview" title="Preview"><i class="fa-regular fa-eye"></i></button>
+          <button class="btn-icon" data-action="download" title="Download"><i class="fa-solid fa-download"></i></button>
+          <button class="btn-icon" data-action="copy-link" title="Copy Link"><i class="fa-solid fa-link"></i></button>
+          <button class="btn-icon" data-action="move-to-trash" title="Move to Trash"><i class="fa-regular fa-trash-can"></i></button>
+          <button class="menu-btn" data-action="open-menu" title="More"><i class="fa-solid fa-ellipsis-vertical"></i></button>
+        `}
       </div>
     </td>`;
 
   tr.addEventListener('click', (e) => { if (!e.target.closest('button')) openPreviewModal(file); });
   tr.querySelector('[data-action="toggle-star"]')?.addEventListener('click', (e) => { e.stopPropagation(); toggleStar(file); });
-  tr.querySelector('[data-action="preview"]')?.addEventListener('click',     (e) => { e.stopPropagation(); openPreviewModal(file); });
-  tr.querySelector('[data-action="download"]')?.addEventListener('click',    (e) => { e.stopPropagation(); downloadFile(file); });
-  tr.querySelector('[data-action="open-menu"]')?.addEventListener('click',   (e) => { e.stopPropagation(); showContextMenu(e, file); });
+  tr.querySelector('[data-action="preview"]')?.addEventListener('click', (e) => { e.stopPropagation(); openPreviewModal(file); });
+  tr.querySelector('[data-action="download"]')?.addEventListener('click', (e) => { e.stopPropagation(); downloadFile(file); });
+  tr.querySelector('[data-action="copy-link"]')?.addEventListener('click', (e) => { e.stopPropagation(); copyFileLink(file); });
+  tr.querySelector('[data-action="move-to-trash"]')?.addEventListener('click', (e) => { e.stopPropagation(); moveToTrash(file); });
+  tr.querySelector('[data-action="restore"]')?.addEventListener('click', (e) => { e.stopPropagation(); restoreFromTrash(file); });
+  tr.querySelector('[data-action="permanent-delete"]')?.addEventListener('click', (e) => { e.stopPropagation(); openDeleteModal(file); });
+  tr.querySelector('[data-action="open-menu"]')?.addEventListener('click', (e) => { e.stopPropagation(); showContextMenu(e, file); });
 
   return tr;
 }
@@ -961,13 +1063,174 @@ renameForm?.addEventListener('submit', async (e) => {
   } catch (err) { alert(err.message || 'Rename failed.'); }
 });
 
-// ── Delete ────────────────────────────────────────────────────────────────────
+// ── Copy Link ─────────────────────────────────────────────────────────────────
+export function copyFileLink(file) {
+  const url = file?.fileUrl || file?.url;
+  if (!url) {
+    showToast('No URL available for this file.', true);
+    return;
+  }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).then(() => {
+      showToast('Link copied to clipboard!');
+    }).catch(() => {
+      fallbackCopy(url);
+    });
+  } else {
+    fallbackCopy(url);
+  }
+}
+
+function fallbackCopy(text) {
+  const input = document.createElement('input');
+  input.value = text;
+  document.body.appendChild(input);
+  input.select();
+  try {
+    document.execCommand('copy');
+    showToast('Link copied to clipboard!');
+  } catch (_) {
+    showToast('Failed to copy link.', true);
+  }
+  document.body.removeChild(input);
+}
+
+// ── Soft Delete: Move to Trash ────────────────────────────────────────────────
+export async function moveToTrash(file) {
+  const user = (firebase.auth && typeof firebase.auth === 'function' && firebase.auth().currentUser)
+    ? firebase.auth().currentUser
+    : (auth.currentUser || getCurrentUser());
+  if (!user || !file) return;
+
+  try {
+    file.isTrashed = true;
+    file.isTrash = true;
+    applyFiltersAndRender();
+    showToast(`Moved "${file.fileName || file.name}" to Trash.`);
+
+    await Promise.all([
+      updateDoc(doc(db, 'users', user.uid, 'files', file.id), {
+        isTrashed: true,
+        isTrash:   true,
+        trashedAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      }).catch(() => {}),
+      updateDoc(doc(db, 'files', file.id), {
+        isTrashed: true,
+        isTrash:   true,
+        trashedAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      }).catch(() => {})
+    ]);
+
+    // Recalculate active storage used
+    const activeBytes = calculateActiveStorage();
+    if (profile) {
+      profile.storageUsedBytes = activeBytes;
+      profile.usedStorageBytes = activeBytes;
+      profile.storageUsed      = activeBytes;
+      updateStorageUI(profile);
+    }
+    await updateDoc(doc(db, 'users', user.uid), {
+      storageUsedBytes: activeBytes,
+      usedStorageBytes: activeBytes,
+      storageUsed:      activeBytes,
+      updatedAt:        serverTimestamp()
+    }).catch(() => {});
+  } catch (err) {
+    console.error('[Zulora Trash] moveToTrash error:', err);
+    showToast('Failed to move to Trash: ' + err.message, true);
+  }
+}
+
+// ── Restore from Trash ────────────────────────────────────────────────────────
+export async function restoreFromTrash(file) {
+  const user = (firebase.auth && typeof firebase.auth === 'function' && firebase.auth().currentUser)
+    ? firebase.auth().currentUser
+    : (auth.currentUser || getCurrentUser());
+  if (!user || !file) return;
+
+  try {
+    file.isTrashed = false;
+    file.isTrash = false;
+    applyFiltersAndRender();
+    showToast(`Restored "${file.fileName || file.name}" to My Drive.`);
+
+    await Promise.all([
+      updateDoc(doc(db, 'users', user.uid, 'files', file.id), {
+        isTrashed: false,
+        isTrash:   false,
+        restoredAt: serverTimestamp(),
+        updatedAt:  serverTimestamp()
+      }).catch(() => {}),
+      updateDoc(doc(db, 'files', file.id), {
+        isTrashed: false,
+        isTrash:   false,
+        restoredAt: serverTimestamp(),
+        updatedAt:  serverTimestamp()
+      }).catch(() => {})
+    ]);
+
+    // Recalculate active storage used
+    const activeBytes = calculateActiveStorage();
+    if (profile) {
+      profile.storageUsedBytes = activeBytes;
+      profile.usedStorageBytes = activeBytes;
+      profile.storageUsed      = activeBytes;
+      updateStorageUI(profile);
+    }
+    await updateDoc(doc(db, 'users', user.uid), {
+      storageUsedBytes: activeBytes,
+      usedStorageBytes: activeBytes,
+      storageUsed:      activeBytes,
+      updatedAt:        serverTimestamp()
+    }).catch(() => {});
+  } catch (err) {
+    console.error('[Zulora Trash] restoreFromTrash error:', err);
+    showToast('Failed to restore file: ' + err.message, true);
+  }
+}
+
+// ── Empty Trash (Bulk Permanent Delete) ───────────────────────────────────────
+export async function emptyTrash() {
+  const trashedFiles = allFiles.filter(f => f.isTrashed || f.isTrash);
+  if (trashedFiles.length === 0) {
+    showToast('Recycle Bin is already empty.');
+    return;
+  }
+  if (!confirm(`Permanently delete all ${trashedFiles.length} item(s) from the Recycle Bin? This action cannot be undone.`)) {
+    return;
+  }
+
+  const user = (firebase.auth && typeof firebase.auth === 'function' && firebase.auth().currentUser)
+    ? firebase.auth().currentUser
+    : (auth.currentUser || getCurrentUser());
+  if (!user) return;
+
+  showToast('Emptying trash...');
+  try {
+    for (const f of trashedFiles) {
+      await Promise.all([
+        deleteDoc(doc(db, 'users', user.uid, 'files', f.id)).catch(() => {}),
+        deleteDoc(doc(db, 'files', f.id)).catch(() => {})
+      ]);
+    }
+    allFiles = allFiles.filter(f => !f.isTrashed && !f.isTrash);
+    applyFiltersAndRender();
+    showToast('Recycle Bin emptied.');
+  } catch (err) {
+    console.error('[Zulora Trash] emptyTrash error:', err);
+    showToast('Failed to empty trash: ' + err.message, true);
+  }
+}
+
+// ── Permanent Delete Modal & Confirmation ─────────────────────────────────────
 function openDeleteModal(file) {
   selectedFile = file;
   const name   = file.fileName || file.originalName || file.name || 'this file';
   const prompt = $('deletePromptText');
   if (prompt) prompt.textContent =
-    `Delete "${name}" permanently? This cannot be undone and your storage quota will be reclaimed immediately.`;
+    `Permanently delete "${name}"? This action cannot be undone.`;
   deleteModal?.classList.add('show');
 }
 
@@ -975,22 +1238,17 @@ confirmDeleteBtn?.addEventListener('click', async () => {
   if (!selectedFile) return;
   confirmDeleteBtn.disabled   = true;
   confirmDeleteBtn.innerHTML  = '<i class="fa-solid fa-circle-notch fa-spin"></i> Deleting...';
-  const user = getCurrentUser();
+  const user = (firebase.auth && typeof firebase.auth === 'function' && firebase.auth().currentUser)
+    ? firebase.auth().currentUser
+    : (auth.currentUser || getCurrentUser());
 
   try {
     // 1. Remove Firestore doc under user ownership AND global files collection
     if (user) {
-      const fileBytes = Number(selectedFile.size || selectedFile.fileSize || 0);
       await Promise.all([
         deleteDoc(doc(db, 'users', user.uid, 'files', selectedFile.id)).catch(() => {}),
         deleteDoc(doc(db, 'files', selectedFile.id)).catch(() => {})
       ]);
-      await updateDoc(doc(db, 'users', user.uid), {
-        storageUsedBytes: increment(-fileBytes),
-        usedStorageBytes: increment(-fileBytes),
-        storageUsed:      increment(-fileBytes),
-        updatedAt:        serverTimestamp()
-      }).catch(() => {});
     }
 
     // 2. Clean up legacy Firebase Storage path if present
@@ -999,7 +1257,9 @@ confirmDeleteBtn?.addEventListener('click', async () => {
       catch (e) { /* ignore */ }
     }
 
+    allFiles = allFiles.filter(f => f.id !== selectedFile.id);
     deleteModal?.classList.remove('show');
+    showToast('File permanently deleted.');
     await refreshFileList();
   } catch (err) {
     alert(err.message || 'Failed to delete file.');
@@ -1033,18 +1293,24 @@ fileContextMenu?.addEventListener('click', (e) => {
   if (!item || !selectedFile) return;
   fileContextMenu.classList.remove('show');
   const action = item.dataset.action;
-  if (action === 'preview')  openPreviewModal(selectedFile);
-  if (action === 'download') downloadFile(selectedFile);
-  if (action === 'rename')   openRenameModal(selectedFile);
-  if (action === 'star')     toggleStar(selectedFile);
-  if (action === 'delete')   openDeleteModal(selectedFile);
+  if (action === 'preview')   openPreviewModal(selectedFile);
+  if (action === 'download')  downloadFile(selectedFile);
+  if (action === 'copy-link') copyFileLink(selectedFile);
+  if (action === 'rename')    openRenameModal(selectedFile);
+  if (action === 'star')      toggleStar(selectedFile);
+  if (action === 'trash')     moveToTrash(selectedFile);
+  if (action === 'restore')   restoreFromTrash(selectedFile);
+  if (action === 'delete')    openDeleteModal(selectedFile);
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
 // USER DATA ISOLATION & CLOUDINARY UPLOAD HANDLER
 // ══════════════════════════════════════════════════════════════════════════════
-newUploadBtn?.addEventListener('click',  () => fileUploadInput?.click());
-emptyUploadBtn?.addEventListener('click',() => fileUploadInput?.click());
+newUploadBtn?.addEventListener('click',     () => fileUploadInput?.click());
+headerUploadBtn?.addEventListener('click',  () => fileUploadInput?.click());
+emptyUploadBtn?.addEventListener('click',   () => fileUploadInput?.click());
+emptyTrashBtn?.addEventListener('click',    () => emptyTrash());
+sidebarAdminBtn?.addEventListener('click',  () => adminDashboardBtn?.click());
 
 fileUploadInput?.addEventListener('change', (e) => {
   const files = Array.from(e.target.files || []);
@@ -1174,10 +1440,11 @@ function uploadFileToCloudinary(fileObj, onProgress) {
                 : serverTimestamp(),
               userUid:            (firebase.auth && typeof firebase.auth === 'function' && firebase.auth().currentUser)
                 ? firebase.auth().currentUser.uid
-                : (currentUser ? currentUser.uid : "anonymous"),
+                : (currentUser ? currentUser.uid : "guest"),
               userName:           (firebase.auth && typeof firebase.auth === 'function' && firebase.auth().currentUser)
                 ? (firebase.auth().currentUser.displayName || currentUser?.displayName || (currentUser?.email ? currentUser.email.split('@')[0] : "User"))
                 : (currentUser?.displayName || "Guest User"),
+              isTrashed:          false,
               // Dual-write mirror fields for UI renderer & search
               id:                 fileId,
               name:               fileObj.name,
@@ -1353,10 +1620,10 @@ async function uploadFilesBatch(files) {
   } catch (batchErr) {
     console.error('[Zulora Upload] Batch error:', batchErr);
   } finally {
-    // 6. IN ALL CASES (success or error), close/reset upload progress modal inside a finally block so UI never freezes at 0%
-    setTimeout(() => {
-      dismissProgressPopup();
-    }, 800);
+    // 3. FAILSAFE UI MODAL CLEANUP:
+    // Always dismiss upload modals and reset file inputs in a `finally` block so the UI never freezes at 0%
+    if (fileUploadInput) fileUploadInput.value = '';
+    dismissProgressPopup();
     await refreshFileList();
   }
 }
@@ -1399,11 +1666,17 @@ document.querySelectorAll('.sidebar-nav .nav-item').forEach((item) => {
     item.classList.add('active');
 
     if (item.dataset.nav) {
+      if (item.dataset.nav === 'admin') {
+        adminDashboardBtn?.click();
+        return;
+      }
       currentNav = item.dataset.nav;
       currentCategory = 'all';
       document.querySelectorAll('.filter-chip').forEach((c) => c.classList.remove('active'));
       document.querySelector('.filter-chip[data-filter="all"]')?.classList.add('active');
-      if (currentViewTitle) currentViewTitle.textContent = item.querySelector('span')?.textContent || 'My Drive';
+      if (currentViewTitle) {
+        currentViewTitle.textContent = currentNav === 'trash' ? 'Trash / Recycle Bin' : (item.querySelector('span')?.textContent || 'My Drive');
+      }
     } else if (item.dataset.category) {
       currentNav = 'my-drive';
       currentCategory = item.dataset.category;
