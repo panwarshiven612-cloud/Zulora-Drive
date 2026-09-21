@@ -1,7 +1,8 @@
 /**
  * Zulora Drive — Firebase Client Configuration Module
  *
- * Uses Firebase Modular Web SDK v10.12.2 (Auth, Firestore, Cloud Storage).
+ * Firebase Modular Web SDK v10.12.2 (Auth, Firestore, Cloud Storage).
+ * Exact project config as specified in the production deployment brief.
  */
 
 import { initializeApp, getApps } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
@@ -42,7 +43,7 @@ import {
   runTransaction
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
-// Exact Firebase Web App Project Configuration
+// ── Official Zulora Drive Firebase Project Configuration ──────────────────────
 export const firebaseConfig = {
   apiKey: "AIzaSyBGOtawcfRqXTm7jw5P3DB0qhJCUTmfyDc",
   authDomain: "zulora-drive.firebaseapp.com",
@@ -52,10 +53,10 @@ export const firebaseConfig = {
   appId: "1:715420173020:web:46245edda3eb0f31edaa19"
 };
 
-// Initialize Firebase App
+// Initialize Firebase (guard against duplicate initialization in dev reloads)
 export const firebaseApp = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 
-// Initialize Firebase Auth
+// Firebase Auth — persist session across browser tabs & refreshes
 export const auth = getAuth(firebaseApp);
 export const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: 'select_account' });
@@ -64,11 +65,13 @@ setPersistence(auth, browserLocalPersistence).catch((err) => {
   console.warn('[Zulora Firebase] Session persistence warning:', err.message);
 });
 
-// Initialize Cloud Storage & Firestore
+// Firebase Cloud Storage (explicit bucket URI)
 export const storage = getStorage(firebaseApp, 'gs://zulora-drive.firebasestorage.app');
+
+// Cloud Firestore
 export const db = getFirestore(firebaseApp);
 
-// Export Modular SDK Primitives
+// Re-export all modular SDK primitives consumed by auth.js and app.js
 export {
   signInWithPopup,
   signInWithRedirect,
@@ -93,4 +96,3 @@ export {
   increment,
   runTransaction
 };
-
