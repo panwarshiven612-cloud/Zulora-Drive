@@ -1,15 +1,17 @@
 /**
  * Zulora Drive — Primary Application Logic
  *
- * Firebase Web SDK v10 (Auth + Firestore + Cloud Storage)
+ * Firebase Web SDK v10 (Auth + Firestore) & Cloudinary Storage
  *
  * Features:
  *   • Google SSO + Email/Password via Firebase Auth
- *   • Strict user isolation: users/{uid}/files/ storage path
+ *   • Cloudinary client-side upload with strict per-user data isolation:
+ *       folder: zulora_drive/users/${currentUser.uid}
+ *   • Real-time Firestore synchronization:
+ *       users/{currentUser.uid}/files (only accessible by current user)
  *   • 10 GB Free Starter quota with real-time progress meter
- *   • Drag-and-drop & click-to-upload with live progress drawer
- *   • Firestore metadata sync (name, size, type, uploadedAt, downloadURL)
- *   • Dynamic file search, rename, delete (storage + Firestore)
+ *   • Drag-and-drop & click-to-upload with live XMLHttpRequest progress
+ *   • Dynamic file search, rename, delete (Firestore + Quota reclamation)
  *   • Grid / List view toggle (persisted in localStorage)
  *   • Segmented storage bar (Photos, Docs, Videos, Audio, Other)
  *   • Referral system (+5 GB per successful referral)
@@ -35,11 +37,14 @@ import {
   deriveUsername,
   deriveAccountId,
   getReferralLink,
-  uploadFileToFirebaseStorage,
-  updateUserQuota
+  updateUserQuota,
+  CLOUDINARY_CLOUD_NAME,
+  CLOUDINARY_UPLOAD_PRESET,
+  CLOUDINARY_API_ENDPOINT
 } from './auth.js';
 
 import {
+  auth,
   storage,
   db,
   storageRef,
@@ -51,7 +56,11 @@ import {
   updateDoc,
   deleteDoc,
   serverTimestamp,
-  increment
+  increment,
+  query,
+  orderBy,
+  onSnapshot,
+  firebase
 } from './firebase-config.js';
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -66,6 +75,11 @@ let currentSort     = 'date-desc';
 let selectedFile    = null;
 let activePlan      = null;
 let profile         = null;
+let filesUnsubscribe = null;
+
+// Track active progress bar for current upload
+let currentActiveProgressBar = null;
+let currentActiveProgressStatus = null;
 
 // ══════════════════════════════════════════════════════════════════════════════
 // DOM ELEMENT REFS
@@ -169,7 +183,7 @@ function formatDate(iso) {
 }
 
 function getFileCategory(mime = '', filename = '') {
-  const m   = mime.toLowerCase();
+  const m   = (mime || '').toLowerCase();
   const ext = (filename.split('.').pop() || '').toLowerCase();
 
   if (m.startsWith('image/') || ['jpg','jpeg','png','gif','webp','svg','bmp','ico'].includes(ext))
@@ -224,8 +238,8 @@ function updateStorageUI(p) {
   // Segmented category bar
   let photoBytes = 0, docBytes = 0, mediaBytes = 0, audioBytes = 0, otherBytes = 0;
   allFiles.forEach((f) => {
-    const sz  = Number(f.size || 0);
-    const cat = getFileCategory(f.mimetype || f.type, f.name);
+    const sz  = Number(f.size || f.fileSize || 0);
+    const cat = getFileCategory(f.mimetype || f.type || f.fileType, f.name || f.fileName);
     if      (cat === 'images')    photoBytes += sz;
     else if (cat === 'documents') docBytes   += sz;
     else if (cat === 'videos')    mediaBytes += sz;
@@ -300,11 +314,127 @@ function setupUserUI(user, prof) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// PROGRESS BAR UI UPDATER
+// ══════════════════════════════════════════════════════════════════════════════
+function updateUIProgressBar(percent) {
+  if (currentActiveProgressBar) {
+    currentActiveProgressBar.style.width = `${percent}%`;
+  }
+  if (currentActiveProgressStatus) {
+    currentActiveProgressStatus.textContent = `${percent}%`;
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SECURE FILE RETRIEVAL & REAL-TIME SYNCHRONIZATION
+// ══════════════════════════════════════════════════════════════════════════════
+/**
+ * Real-time listener: strictly queries files belonging to the logged-in user.
+ * db.collection("users").doc(currentUser.uid).collection("files")
+ *   .orderBy("createdAt", "desc")
+ *   .onSnapshot(...)
+ */
+function subscribeUserFiles(currentUser) {
+  if (!currentUser?.uid) return;
+
+  if (typeof filesUnsubscribe === 'function') {
+    filesUnsubscribe();
+    filesUnsubscribe = null;
+  }
+
+  try {
+    filesUnsubscribe = db.collection("users").doc(currentUser.uid).collection("files")
+      .orderBy("createdAt", "desc")
+      .onSnapshot(
+        (snapshot) => {
+          renderFileList(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        },
+        (err) => {
+          console.warn("[Zulora Files] onSnapshot orderBy error, falling back without orderBy:", err.message);
+          filesUnsubscribe = db.collection("users").doc(currentUser.uid).collection("files")
+            .onSnapshot((snapshot) => {
+              renderFileList(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            });
+        }
+      );
+  } catch (err) {
+    console.error("[Zulora Files] subscribeUserFiles error:", err);
+  }
+}
+
+/**
+ * Normalizes and populates file records, applies filters and updates view
+ */
+function renderFileList(fileDocs) {
+  allFiles = (fileDocs || []).map((d) => {
+    let iso = new Date().toISOString();
+    if (d.createdAt?.toDate)                 iso = d.createdAt.toDate().toISOString();
+    else if (d.uploadedAt?.toDate)            iso = d.uploadedAt.toDate().toISOString();
+    else if (typeof d.createdAt === 'string')  iso = d.createdAt;
+    else if (typeof d.uploadedAt === 'string') iso = d.uploadedAt;
+
+    const fName = d.fileName || d.name || d.originalName || 'Untitled File';
+    const fSize = Number(d.fileSize ?? d.size ?? 0);
+    const fType = d.fileType || d.type || d.mimetype || 'application/octet-stream';
+    const fUrl  = d.fileUrl  || d.url  || '';
+
+    return {
+      id:                 d.id,
+      name:               fName,
+      originalName:       fName,
+      fileName:           fName,
+      size:               fSize,
+      fileSize:           fSize,
+      type:               fType,
+      fileType:           fType,
+      mimetype:           fType,
+      url:                fUrl,
+      fileUrl:            fUrl,
+      storagePath:        d.storagePath || '',
+      cloudinaryPublicId: d.cloudinaryPublicId || '',
+      userUid:            d.userUid || '',
+      userEmail:          d.userEmail || '',
+      isStarred:          Boolean(d.isStarred),
+      isTrash:            Boolean(d.isTrash),
+      uploadedAt:         iso,
+      createdAt:          iso
+    };
+  });
+
+  applyFiltersAndRender();
+  if (profile) updateStorageUI(profile);
+}
+
+/**
+ * Refresh user profile & quota status
+ */
+async function refreshUserFiles() {
+  const currentUser = auth.currentUser || getCurrentUser();
+  if (!currentUser) return;
+  try {
+    const updated = await refreshProfile().catch(() => null);
+    if (updated) updateStorageUI(updated);
+  } catch (_) {}
+}
+
+// Backward-compatible loadUserFiles
+async function loadUserFiles(uid) {
+  const currentUser = auth.currentUser || getCurrentUser();
+  if (currentUser) {
+    subscribeUserFiles(currentUser);
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 // AUTH LIFECYCLE
 // ══════════════════════════════════════════════════════════════════════════════
 function initAuthLifecycle() {
   onAuthChange(async (user) => {
     if (!user) {
+      if (typeof filesUnsubscribe === 'function') {
+        filesUnsubscribe();
+        filesUnsubscribe = null;
+      }
       window.location.replace('login.html');
       return;
     }
@@ -338,7 +468,7 @@ function initAuthLifecycle() {
 
     setupUserUI(user, profile);
     updateStorageUI(profile);
-    await loadUserFiles(user.uid);
+    subscribeUserFiles(user);
   });
 }
 
@@ -357,42 +487,6 @@ setInterval(async () => {
 }, 45_000);
 
 // ══════════════════════════════════════════════════════════════════════════════
-// FIRESTORE FILE LOADER
-// ══════════════════════════════════════════════════════════════════════════════
-async function loadUserFiles(uid) {
-  if (!uid) return;
-  try {
-    const snap = await getDocs(collection(db, 'users', uid, 'files'));
-    allFiles   = [];
-    snap.forEach((docSnap) => {
-      const d   = docSnap.data();
-      let iso   = new Date().toISOString();
-      if (d.uploadedAt?.toDate)            iso = d.uploadedAt.toDate().toISOString();
-      else if (typeof d.uploadedAt === 'string') iso = d.uploadedAt;
-
-      allFiles.push({
-        id:           docSnap.id,
-        name:         d.name         || d.originalName || 'Untitled File',
-        originalName: d.originalName || d.name         || 'Untitled File',
-        size:         Number(d.size  || 0),
-        type:         d.type         || d.mimetype || 'application/octet-stream',
-        mimetype:     d.mimetype     || d.type     || 'application/octet-stream',
-        url:          d.url          || '',
-        storagePath:  d.storagePath  || '',
-        isStarred:    Boolean(d.isStarred),
-        isTrash:      Boolean(d.isTrash),
-        uploadedAt:   iso
-      });
-    });
-
-    applyFiltersAndRender();
-    if (profile) updateStorageUI(profile);
-  } catch (err) {
-    console.error('[Zulora Files] loadUserFiles error:', err.message);
-  }
-}
-
-// ══════════════════════════════════════════════════════════════════════════════
 // FILTERING, SORTING & RENDERING
 // ══════════════════════════════════════════════════════════════════════════════
 function applyFiltersAndRender() {
@@ -404,12 +498,12 @@ function applyFiltersAndRender() {
     if (currentNav === 'starred' && !file.isStarred)     return false;
 
     if (currentCategory !== 'all') {
-      if (getFileCategory(file.mimetype || file.type, file.name) !== currentCategory) return false;
+      if (getFileCategory(file.mimetype || file.type || file.fileType, file.name || file.fileName) !== currentCategory) return false;
     }
 
     if (query) {
-      const matchName = (file.name || '').toLowerCase().includes(query);
-      const matchType = (file.type || '').toLowerCase().includes(query);
+      const matchName = (file.name || file.fileName || '').toLowerCase().includes(query);
+      const matchType = (file.type || file.fileType || '').toLowerCase().includes(query);
       if (!matchName && !matchType) return false;
     }
 
@@ -419,12 +513,12 @@ function applyFiltersAndRender() {
   // Sorting
   filteredFiles.sort((a, b) => {
     switch (currentSort) {
-      case 'date-asc':  return new Date(a.uploadedAt)  - new Date(b.uploadedAt);
-      case 'name-asc':  return (a.name || '').localeCompare(b.name || '');
-      case 'name-desc': return (b.name || '').localeCompare(a.name || '');
-      case 'size-desc': return (b.size || 0)            - (a.size || 0);
-      case 'size-asc':  return (a.size || 0)            - (b.size || 0);
-      default:          return new Date(b.uploadedAt)  - new Date(a.uploadedAt);
+      case 'date-asc':  return new Date(a.createdAt || a.uploadedAt)  - new Date(b.createdAt || b.uploadedAt);
+      case 'name-asc':  return (a.name || a.fileName || '').localeCompare(b.name || b.fileName || '');
+      case 'name-desc': return (b.name || b.fileName || '').localeCompare(a.name || a.fileName || '');
+      case 'size-desc': return (b.size || b.fileSize || 0)            - (a.size || a.fileSize || 0);
+      case 'size-asc':  return (a.size || a.fileSize || 0)            - (b.size || b.fileSize || 0);
+      default:          return new Date(b.createdAt || b.uploadedAt)  - new Date(a.createdAt || a.uploadedAt);
     }
   });
 
@@ -485,7 +579,7 @@ function renderGridView() {
         <div class="file-card-title" title="${escHtml(file.name)}">${escHtml(file.name)}</div>
         <div class="file-card-meta">
           <span>${formatBytes(file.size)}</span>
-          <span>${formatDate(file.uploadedAt)}</span>
+          <span>${formatDate(file.uploadedAt || file.createdAt)}</span>
         </div>
       </div>`;
 
@@ -515,7 +609,7 @@ function renderListView() {
         </div>
       </td>
       <td>${formatBytes(file.size)}</td>
-      <td>${formatDate(file.uploadedAt)}</td>
+      <td>${formatDate(file.uploadedAt || file.createdAt)}</td>
       <td>
         <div class="table-actions">
           <button class="star-btn${file.isStarred ? ' starred' : ''}" data-action="toggle-star" title="Star">
@@ -549,8 +643,8 @@ function escHtml(str) {
 // ── Quick Preview Modal ───────────────────────────────────────────────────────
 function openPreviewModal(file) {
   selectedFile = file;
-  const name   = file.originalName || file.name || 'File Preview';
-  const url    = file.url;
+  const name   = file.fileName || file.originalName || file.name || 'File Preview';
+  const url    = file.fileUrl || file.url;
 
   if (previewTitle)       previewTitle.textContent = name;
   if (previewDownloadBtn) { previewDownloadBtn.href = url; previewDownloadBtn.download = name; }
@@ -558,18 +652,18 @@ function openPreviewModal(file) {
     '<div style="color:var(--text-muted);"><i class="fa-solid fa-circle-notch fa-spin"></i> Loading preview...</div>';
   previewModal?.classList.add('show');
 
-  const cat = getFileCategory(file.mimetype || file.type, name);
+  const cat = getFileCategory(file.mimetype || file.type || file.fileType, name);
 
   if (cat === 'images') {
     previewContainer.innerHTML = `<img src="${url}" alt="${escHtml(name)}"
       style="max-width:100%;max-height:55vh;object-fit:contain;border-radius:8px;">`;
   } else if (cat === 'videos') {
     previewContainer.innerHTML = `<video controls autoplay style="max-width:100%;max-height:55vh;border-radius:8px;">
-      <source src="${url}" type="${file.mimetype || 'video/mp4'}">Preview not supported.</video>`;
+      <source src="${url}" type="${file.mimetype || file.type || 'video/mp4'}">Preview not supported.</video>`;
   } else if (cat === 'audio') {
     previewContainer.innerHTML = `<audio controls autoplay style="width:85%;">
-      <source src="${url}" type="${file.mimetype || 'audio/mpeg'}">Audio preview not supported.</audio>`;
-  } else if (name.endsWith('.pdf') || (file.mimetype || '').includes('pdf')) {
+      <source src="${url}" type="${file.mimetype || file.type || 'audio/mpeg'}">Audio preview not supported.</audio>`;
+  } else if (name.endsWith('.pdf') || (file.mimetype || file.type || '').includes('pdf')) {
     previewContainer.innerHTML = `<iframe src="${url}"
       style="width:100%;height:55vh;border:none;border-radius:8px;"></iframe>`;
   } else {
@@ -586,7 +680,7 @@ function openPreviewModal(file) {
             <div style="display:flex;flex-direction:column;align-items:center;gap:12px;">
               <i class="${m.icon}" style="font-size:4.5rem;color:${m.color}"></i>
               <div style="font-weight:700;font-size:1rem;">${escHtml(name)}</div>
-              <div style="font-size:0.85rem;color:var(--text-muted);">${formatBytes(file.size)}</div>
+              <div style="font-size:0.85rem;color:var(--text-muted);">${formatBytes(file.size || file.fileSize)}</div>
             </div>`;
         }
       })
@@ -596,10 +690,11 @@ function openPreviewModal(file) {
 
 // ── Download ──────────────────────────────────────────────────────────────────
 function downloadFile(file) {
-  if (!file?.url) return;
+  const url = file?.fileUrl || file?.url;
+  if (!url) return;
   const a     = document.createElement('a');
-  a.href      = file.url;
-  a.download  = file.name || 'download';
+  a.href      = url;
+  a.download  = file.fileName || file.name || 'download';
   a.target    = '_blank';
   document.body.appendChild(a);
   a.click();
@@ -622,7 +717,7 @@ async function toggleStar(file) {
 // ── Rename ────────────────────────────────────────────────────────────────────
 function openRenameModal(file) {
   selectedFile = file;
-  if (renameInput) renameInput.value = file.originalName || file.name || '';
+  if (renameInput) renameInput.value = file.fileName || file.originalName || file.name || '';
   if (renameModal) { renameModal.classList.add('show'); renameInput?.focus(); }
 }
 
@@ -635,18 +730,20 @@ renameForm?.addEventListener('submit', async (e) => {
   try {
     if (user) {
       await updateDoc(doc(db, 'users', user.uid, 'files', selectedFile.id), {
-        name: newName, originalName: newName, updatedAt: serverTimestamp()
+        name:         newName,
+        fileName:     newName,
+        originalName: newName,
+        updatedAt:    serverTimestamp()
       });
     }
     renameModal?.classList.remove('show');
-    await loadUserFiles(user?.uid);
   } catch (err) { alert(err.message || 'Rename failed.'); }
 });
 
 // ── Delete ────────────────────────────────────────────────────────────────────
 function openDeleteModal(file) {
   selectedFile = file;
-  const name   = file.originalName || file.name || 'this file';
+  const name   = file.fileName || file.originalName || file.name || 'this file';
   const prompt = $('deletePromptText');
   if (prompt) prompt.textContent =
     `Delete "${name}" permanently? This cannot be undone and your storage quota will be reclaimed immediately.`;
@@ -660,26 +757,25 @@ confirmDeleteBtn?.addEventListener('click', async () => {
   const user = getCurrentUser();
 
   try {
-    // 1. Remove from Cloud Storage
-    if (selectedFile.storagePath) {
-      try { await deleteObject(storageRef(storage, selectedFile.storagePath)); }
-      catch (e) { console.warn('[Zulora Storage] Delete notice:', e.message); }
-    }
-
-    // 2. Remove Firestore doc + decrement quota
+    // 1. Remove Firestore doc under strict user ownership
     if (user) {
+      const fileBytes = Number(selectedFile.size || selectedFile.fileSize || 0);
       await deleteDoc(doc(db, 'users', user.uid, 'files', selectedFile.id));
       await updateDoc(doc(db, 'users', user.uid), {
-        usedStorageBytes: increment(-Number(selectedFile.size || 0)),
-        storageUsed:      increment(-Number(selectedFile.size || 0)),
+        usedStorageBytes: increment(-fileBytes),
+        storageUsed:      increment(-fileBytes),
         updatedAt:        serverTimestamp()
       }).catch(() => {});
     }
 
+    // 2. Clean up legacy Firebase Storage path if present
+    if (selectedFile.storagePath) {
+      try { await deleteObject(storageRef(storage, selectedFile.storagePath)); }
+      catch (e) { /* ignore */ }
+    }
+
     deleteModal?.classList.remove('show');
-    const updated = await refreshProfile().catch(() => null);
-    if (updated) updateStorageUI(updated);
-    await loadUserFiles(user?.uid);
+    refreshUserFiles();
   } catch (err) {
     alert(err.message || 'Failed to delete file.');
   } finally {
@@ -720,7 +816,7 @@ fileContextMenu?.addEventListener('click', (e) => {
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
-// FILE UPLOAD — DRAG & DROP + CLICK-TO-UPLOAD
+// USER DATA ISOLATION & CLOUDINARY UPLOAD HANDLER
 // ══════════════════════════════════════════════════════════════════════════════
 newUploadBtn?.addEventListener('click',  () => fileUploadInput?.click());
 emptyUploadBtn?.addEventListener('click',() => fileUploadInput?.click());
@@ -748,13 +844,114 @@ if (mainWorkspace) {
 }
 
 /**
+ * Cloudinary Upload Pipeline with strict user isolation:
+ *   - Checks Firebase Authentication status before upload
+ *   - Constructs FormData with upload_preset and folder `zulora_drive/users/${currentUser.uid}`
+ *   - Uses XMLHttpRequest to perform upload and track progress
+ *   - Onload: stores metadata in Firestore under strict user ownership
+ *   - Calls refreshUserFiles()
+ */
+function uploadFileToCloudinary(file, onProgress) {
+  return new Promise((resolve, reject) => {
+    // 1. Ensure Firebase Authentication status is checked before any upload
+    const currentUser = auth.currentUser || getCurrentUser();
+    if (!currentUser) {
+      alert("Please sign in first!");
+      return reject(new Error("Unauthenticated"));
+    }
+
+    // 2. Get current user's UID and email
+    const userUid   = currentUser.uid;
+    const userEmail = currentUser.email || '';
+
+    // 3. Construct FormData
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', 'zulora_preset');
+    formData.append('folder', `zulora_drive/users/${currentUser.uid}`);
+
+    // 4. Use XMLHttpRequest to perform the upload and track progress
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', 'https://api.cloudinary.com/v1_1/t3dkhv0z/auto/upload', true);
+
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) {
+        const percent = Math.round((e.loaded / e.total) * 100);
+        updateUIProgressBar(percent);
+        if (typeof onProgress === 'function') onProgress(percent);
+      }
+    };
+
+    xhr.onload = async () => {
+      if (xhr.status === 200) {
+        try {
+          const response = JSON.parse(xhr.responseText);
+
+          // Store metadata in Firestore under strict user ownership
+          await db.collection("users").doc(currentUser.uid).collection("files").add({
+            fileName:           file.name,
+            fileType:           file.type || 'application/octet-stream',
+            fileSize:           file.size,
+            fileUrl:            response.secure_url,
+            cloudinaryPublicId: response.public_id,
+            userUid:            currentUser.uid,
+            userEmail:          currentUser.email || '',
+            createdAt:          firebase.firestore.FieldValue.serverTimestamp(),
+            // Compatible mirror fields for UI renderer
+            name:               file.name,
+            originalName:       file.name,
+            type:               file.type || 'application/octet-stream',
+            mimetype:           file.type || 'application/octet-stream',
+            size:               file.size,
+            url:                response.secure_url,
+            isStarred:          false,
+            isTrash:            false,
+            uploadedAt:         firebase.firestore.FieldValue.serverTimestamp(),
+            updatedAt:          firebase.firestore.FieldValue.serverTimestamp()
+          });
+
+          // Update user's usedStorageBytes in Firestore
+          try {
+            await updateDoc(doc(db, 'users', currentUser.uid), {
+              usedStorageBytes: increment(file.size),
+              storageUsed:      increment(file.size),
+              updatedAt:        serverTimestamp()
+            });
+          } catch (qErr) {
+            console.warn('[Zulora] Quota increment notice:', qErr.message);
+          }
+
+          refreshUserFiles();
+          resolve(response);
+        } catch (dbErr) {
+          console.error("Upload error saving metadata:", dbErr);
+          reject(dbErr);
+        }
+      } else {
+        console.error("Upload error:", xhr.responseText);
+        alert("Upload failed. Check console for details.");
+        reject(new Error(xhr.responseText || 'Upload failed'));
+      }
+    };
+
+    xhr.onerror = () => {
+      console.error("Upload network error");
+      alert("Network error during upload. Please check your connection.");
+      reject(new Error("Network error during upload"));
+    };
+
+    xhr.send(formData);
+  });
+}
+
+/**
  * Batch upload pipeline with:
  *   - 500 MB per-file limit check (Starter plan)
  *   - Storage quota check before each upload
  *   - Live progress drawer with per-file bars
  */
 async function uploadFilesBatch(files) {
-  const user = getCurrentUser();
+  const user = auth.currentUser || getCurrentUser();
   if (!user) { alert('Please sign in first!'); return; }
   if (!uploadDrawer) return;
 
@@ -762,7 +959,7 @@ async function uploadFilesBatch(files) {
   uploadDrawer.classList.add('show');
   if (uploadDrawerStatus) {
     uploadDrawerStatus.innerHTML =
-      '<i class="fa-solid fa-circle-notch fa-spin text-azure"></i> Uploading to Zulora Drive...';
+      '<i class="fa-solid fa-circle-notch fa-spin text-azure"></i> Uploading to Zulora Drive (Cloudinary)...';
   }
   if (uploadDrawerBody) uploadDrawerBody.innerHTML = '';
 
@@ -797,11 +994,12 @@ async function uploadFilesBatch(files) {
 
     const bar    = row.querySelector('.upload-item-progress-bar');
     const status = row.querySelector('.upload-status-text');
+    currentActiveProgressBar    = bar;
+    currentActiveProgressStatus = status;
 
     try {
-      await uploadFileToFirebaseStorage(file, (progress) => {
-        if (bar)    bar.style.width    = `${progress}%`;
-        if (status) status.textContent = `${progress}%`;
+      await uploadFileToCloudinary(file, (progress) => {
+        updateUIProgressBar(progress);
       });
       if (status) status.innerHTML = '<i class="fa-solid fa-circle-check" style="color:#10b981;"></i> Done';
       if (bar)    bar.style.background = '#10b981';
@@ -809,7 +1007,6 @@ async function uploadFilesBatch(files) {
       console.error('[Zulora Upload] Error:', err);
       if (status) status.innerHTML = '<i class="fa-solid fa-circle-xmark" style="color:#ef4444;"></i> Failed';
       if (bar)    bar.style.background = '#ef4444';
-      alert(`Failed to upload "${file.name}": ${err.message}`);
     }
   }
 
@@ -817,11 +1014,7 @@ async function uploadFilesBatch(files) {
     uploadDrawerStatus.innerHTML = '<i class="fa-solid fa-check" style="color:#10b981;"></i> Uploads complete';
   }
 
-  try {
-    const updated = await refreshProfile();
-    updateStorageUI(updated);
-  } catch (_) {}
-  await loadUserFiles(user.uid);
+  refreshUserFiles();
 }
 
 closeUploadDrawerBtn?.addEventListener('click', () => {
@@ -910,8 +1103,14 @@ userAvatarBtn?.addEventListener('click', (e) => {
 
 // Sign Out
 logoutBtn?.addEventListener('click', async () => {
-  try { await logOut(); window.location.replace('login.html'); }
-  catch (err) { alert(err.message || 'Logout failed.'); }
+  try {
+    if (typeof filesUnsubscribe === 'function') {
+      filesUnsubscribe();
+      filesUnsubscribe = null;
+    }
+    await logOut();
+    window.location.replace('login.html');
+  } catch (err) { alert(err.message || 'Logout failed.'); }
 });
 
 // ══════════════════════════════════════════════════════════════════════════════

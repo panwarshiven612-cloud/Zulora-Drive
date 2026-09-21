@@ -6,7 +6,7 @@
  *   • Real-time Firestore profile bootstrapping
  *   • Unique username & ZUL-XXXXXX account ID generation
  *   • Automated referral system (+5 GB bonus per referral)
- *   • Direct client-side Firebase Storage upload pipeline
+ *   • Cloudinary client-side upload pipeline with per-user data isolation
  *   • Admin quota override tool (zulora.help@gmail.com)
  *
  * Default Free Tier: 10 GB Starter Storage
@@ -37,7 +37,8 @@ import {
   updateDoc,
   serverTimestamp,
   increment,
-  runTransaction
+  runTransaction,
+  firebase
 } from './firebase-config.js';
 
 // ── Platform Constants ────────────────────────────────────────────────────────
@@ -50,6 +51,11 @@ export const APP_DOMAIN          = 'https://drive.zulora.in';
 export const DEFAULT_STORAGE_BYTES   = 10 * 1024 * 1024 * 1024; // 10 GB Free Starter
 export const MAX_STARTER_FILE_BYTES  = 500 * 1024 * 1024;        // 500 MB max per file (Starter)
 export const REFERRAL_BONUS_BYTES    = 5 * 1024 * 1024 * 1024;   // +5 GB per referral
+
+// ── Cloudinary Configuration ──────────────────────────────────────────────────
+export const CLOUDINARY_CLOUD_NAME    = 't3dkhv0z';
+export const CLOUDINARY_UPLOAD_PRESET = 'zulora_preset';
+export const CLOUDINARY_API_ENDPOINT  = 'https://api.cloudinary.com/v1_1/t3dkhv0z/auto/upload';
 
 // ── Internal Auth State ───────────────────────────────────────────────────────
 let currentUser           = null;
@@ -92,73 +98,70 @@ export function getReferrerUidFromUrl() {
   }
 }
 
-// ── Direct Firebase Storage Upload Pipeline ───────────────────────────────────
+// ── Cloudinary Upload Pipeline with Strict User Isolation ─────────────────────
 /**
- * Client-side upload:
- *   Storage path:  users/${uid}/files/${timestamp}_${sanitizedName}
- *   Firestore doc: users/${uid}/files/{autoId}
- *   Quota update:  users/${uid}.usedStorageBytes += file.size
+ * Client-side Cloudinary upload:
+ *   Folder:        zulora_drive/users/${currentUser.uid}
+ *   Firestore doc: users/${currentUser.uid}/files/{autoId}
+ *   Quota update:  users/${currentUser.uid}.usedStorageBytes += file.size
  *
  * @param {File}     file        - Browser File object
  * @param {Function} onProgress  - Callback(percent: number)
  * @returns {Promise<Object>}    - Resolved file metadata object
  */
-export function uploadFileToFirebaseStorage(file, onProgress) {
+export function uploadFileToCloudinary(file, onProgress) {
   return new Promise((resolve, reject) => {
-    const user = auth.currentUser || currentUser;
-    if (!user) {
+    const activeUser = auth.currentUser || currentUser;
+    if (!activeUser) {
       return reject(Object.assign(new Error('Please sign in first!'), { code: 'UNAUTHENTICATED' }));
     }
 
-    const cleanName   = (file.name || 'file').replace(/[\u0000-\u001f<>:"/\\|?*]/g, '_');
-    const storagePath = `users/${user.uid}/files/${Date.now()}_${cleanName}`;
-    const fileRef     = storageRef(storage, storagePath);
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+    formData.append('folder', `zulora_drive/users/${activeUser.uid}`);
 
-    const metadata = {
-      contentType: file.type || 'application/octet-stream',
-      customMetadata: {
-        originalName:   file.name,
-        ownerUid:       user.uid,
-        uploadedFrom:   'zulora-drive-web'
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', CLOUDINARY_API_ENDPOINT, true);
+
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) {
+        const percent = Math.round((e.loaded / e.total) * 100);
+        if (typeof onProgress === 'function') onProgress(percent);
       }
     };
 
-    const uploadTask = uploadBytesResumable(fileRef, file, metadata);
-
-    uploadTask.on(
-      'state_changed',
-      (snapshot) => {
-        const progress = snapshot.totalBytes > 0
-          ? Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100)
-          : 0;
-        if (typeof onProgress === 'function') onProgress(progress);
-      },
-      (error) => {
-        console.error('[Firebase Storage] Upload error:', error);
-        reject(error);
-      },
-      async () => {
+    xhr.onload = async () => {
+      if (xhr.status === 200) {
         try {
-          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+          const response = JSON.parse(xhr.responseText);
 
-          // Persist file metadata in Firestore
-          const fileDocRef = await addDoc(collection(db, 'users', user.uid, 'files'), {
-            name:         file.name,
-            originalName: file.name,
-            size:         file.size,
-            type:         file.type || 'application/octet-stream',
-            mimetype:     file.type || 'application/octet-stream',
-            url:          downloadURL,
-            storagePath,
-            isStarred:    false,
-            isTrash:      false,
-            uploadedAt:   serverTimestamp(),
-            updatedAt:    serverTimestamp()
+          // Store metadata in Firestore under strict user ownership
+          const fileDocRef = await db.collection("users").doc(activeUser.uid).collection("files").add({
+            fileName:           file.name,
+            fileType:           file.type || 'application/octet-stream',
+            fileSize:           file.size,
+            fileUrl:            response.secure_url,
+            cloudinaryPublicId: response.public_id,
+            userUid:            activeUser.uid,
+            userEmail:          activeUser.email || '',
+            createdAt:          firebase.firestore.FieldValue.serverTimestamp(),
+            // Compatible mirror fields for UI renderer
+            name:               file.name,
+            originalName:       file.name,
+            type:               file.type || 'application/octet-stream',
+            mimetype:           file.type || 'application/octet-stream',
+            size:               file.size,
+            url:                response.secure_url,
+            isStarred:          false,
+            isTrash:            false,
+            uploadedAt:         firebase.firestore.FieldValue.serverTimestamp(),
+            updatedAt:          firebase.firestore.FieldValue.serverTimestamp()
           });
 
           // Increment user quota counters in Firestore
           try {
-            await updateDoc(doc(db, 'users', user.uid), {
+            await updateDoc(doc(db, 'users', activeUser.uid), {
               usedStorageBytes: increment(file.size),
               storageUsed:      increment(file.size),
               updatedAt:        serverTimestamp()
@@ -168,26 +171,40 @@ export function uploadFileToFirebaseStorage(file, onProgress) {
           }
 
           resolve({
-            id:           fileDocRef.id,
-            name:         file.name,
-            originalName: file.name,
-            size:         file.size,
-            type:         file.type,
-            mimetype:     file.type,
-            url:          downloadURL,
-            storagePath,
-            isStarred:    false,
-            isTrash:      false,
-            uploadedAt:   new Date().toISOString()
+            id:                 fileDocRef.id,
+            fileName:           file.name,
+            fileType:           file.type,
+            fileSize:           file.size,
+            fileUrl:            response.secure_url,
+            cloudinaryPublicId: response.public_id,
+            userUid:            activeUser.uid,
+            userEmail:          activeUser.email,
+            name:               file.name,
+            size:               file.size,
+            url:                response.secure_url,
+            uploadedAt:         new Date().toISOString()
           });
         } catch (dbErr) {
           console.error('[Firestore] Metadata save error:', dbErr);
           reject(dbErr);
         }
+      } else {
+        console.error('Upload error:', xhr.responseText);
+        reject(new Error(xhr.responseText || 'Upload failed'));
       }
-    );
+    };
+
+    xhr.onerror = () => {
+      console.error('Network error during Cloudinary upload');
+      reject(new Error('Network error during upload'));
+    };
+
+    xhr.send(formData);
   });
 }
+
+// Backward-compatible alias
+export const uploadFileToFirebaseStorage = uploadFileToCloudinary;
 
 // ── Profile Bootstrap & Referral Processing ───────────────────────────────────
 /**

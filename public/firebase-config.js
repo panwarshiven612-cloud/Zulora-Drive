@@ -40,7 +40,10 @@ import {
   deleteDoc,
   serverTimestamp,
   increment,
-  runTransaction
+  runTransaction,
+  query,
+  orderBy,
+  onSnapshot
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
 // ── Official Zulora Drive Firebase Project Configuration ──────────────────────
@@ -71,6 +74,63 @@ export const storage = getStorage(firebaseApp, 'gs://zulora-drive.firebasestorag
 // Cloud Firestore
 export const db = getFirestore(firebaseApp);
 
+// Compat bridge for db.collection("users").doc(...).collection("files").add(...) and query chaining
+db.collection = function(colName) {
+  return {
+    doc: function(docId) {
+      return {
+        collection: function(subColName) {
+          const colRef = collection(db, colName, docId, subColName);
+          return {
+            add: function(data) {
+              return addDoc(colRef, data);
+            },
+            doc: function(fileDocId) {
+              const fileDocRef = doc(db, colName, docId, subColName, fileDocId);
+              return {
+                delete: function() { return deleteDoc(fileDocRef); },
+                update: function(data) { return updateDoc(fileDocRef, data); }
+              };
+            },
+            orderBy: function(field, dir = 'desc') {
+              const q = query(colRef, orderBy(field, dir));
+              return {
+                onSnapshot: function(callback, errCallback) {
+                  return onSnapshot(q, callback, errCallback);
+                },
+                get: function() {
+                  return getDocs(q);
+                }
+              };
+            },
+            onSnapshot: function(callback, errCallback) {
+              return onSnapshot(colRef, callback, errCallback);
+            },
+            get: function() {
+              return getDocs(colRef);
+            }
+          };
+        }
+      };
+    }
+  };
+};
+
+export const FieldValue = {
+  serverTimestamp: () => serverTimestamp(),
+  increment: (n) => increment(n)
+};
+
+export const firebase = {
+  firestore: {
+    FieldValue
+  }
+};
+
+if (typeof window !== 'undefined') {
+  window.firebase = firebase;
+}
+
 // Re-export all modular SDK primitives consumed by auth.js and app.js
 export {
   signInWithPopup,
@@ -94,5 +154,8 @@ export {
   deleteDoc,
   serverTimestamp,
   increment,
-  runTransaction
+  runTransaction,
+  query,
+  orderBy,
+  onSnapshot
 };
