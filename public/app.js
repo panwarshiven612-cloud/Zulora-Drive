@@ -106,6 +106,10 @@ const $  = (id) => document.getElementById(id);
 const mobileMenuBtn       = $('mobileMenuBtn');
 const appSidebar          = $('appSidebar');
 const sidebarBackdrop     = $('sidebarBackdrop');
+const apkModal            = $('apkModal');
+const landingApkBtn       = $('landingApkBtn');
+const headerApkBtn        = $('headerApkBtn');
+const sidebarApkBtn       = $('sidebarApkBtn');
 const globalSearchInput   = $('globalSearchInput');
 const searchClearBtn      = $('searchClearBtn');
 const userAvatarBtn       = $('userAvatarBtn');
@@ -2083,6 +2087,15 @@ document.querySelectorAll('[data-open-referral]').forEach((btn) => {
 
     referralModal?.classList.add('show');
   });
+});
+
+function openApkModal() {
+  apkModal?.classList.add('show');
+  closeMobileSidebar();
+}
+
+[landingApkBtn, headerApkBtn, sidebarApkBtn].forEach((button) => {
+  button?.addEventListener('click', openApkModal);
 });
 
 copyReferralBtn?.addEventListener('click', () => {

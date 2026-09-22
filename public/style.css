@@ -331,6 +331,16 @@ a {
   transform: translateY(-1px);
 }
 
+.btn-apk-header {
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+}
+
+.btn-apk-header:hover {
+  background: #d1fae5;
+}
+
 /* User Menu & Avatar */
 .user-menu-wrapper {
   position: relative;
@@ -972,6 +982,16 @@ a {
   border-color: var(--azure-border);
   color: var(--azure-text);
   font-weight: 600;
+}
+
+.apk-download-btn,
+.apk-nav-item {
+  color: #047857;
+}
+
+.apk-download-btn i,
+.apk-nav-item i {
+  color: #16a34a;
 }
 
 /* Toolbar Controls (Sort & View Switcher) */
@@ -1754,6 +1774,47 @@ a {
 .modal-close:hover {
   background: var(--bg-hover);
   color: var(--text-main);
+}
+
+.apk-modal-card {
+  max-width: 460px;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.apk-modal-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  text-align: center;
+}
+
+.apk-modal-instruction {
+  max-width: 360px;
+  margin: 0;
+  color: var(--text-body);
+}
+
+.apk-qr-frame {
+  width: min(240px, 70vw);
+  aspect-ratio: 1;
+  padding: 10px;
+  background: #ffffff;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+}
+
+.apk-qr-frame img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.apk-direct-btn {
+  width: min(100%, 280px);
+  justify-content: center;
 }
 
 .modal-body {
