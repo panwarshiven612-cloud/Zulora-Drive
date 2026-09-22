@@ -597,8 +597,24 @@ export async function saveOrUpdateUserProfile(currentUser) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// AUTH LIFECYCLE
+// AUTH LIFECYCLE & VIEW SEPARATION
 // ══════════════════════════════════════════════════════════════════════════════
+export function setAuthStateUI(isAuthenticated) {
+  const publicLandingPage = $('publicLandingPage');
+  const appContainer      = $('appContainer');
+  const mobileBottomNav   = $('mobileBottomNav');
+
+  if (isAuthenticated) {
+    if (publicLandingPage) publicLandingPage.style.display = 'none';
+    if (appContainer)      appContainer.style.display = 'flex';
+    if (mobileBottomNav)   mobileBottomNav.style.display = 'flex';
+  } else {
+    if (publicLandingPage) publicLandingPage.style.display = 'block';
+    if (appContainer)      appContainer.style.display = 'none';
+    if (mobileBottomNav)   mobileBottomNav.style.display = 'none';
+  }
+}
+
 function initAuthLifecycle() {
   onAuthChange(async (user) => {
     if (!user) {
@@ -606,9 +622,11 @@ function initAuthLifecycle() {
         filesUnsubscribe();
         filesUnsubscribe = null;
       }
-      window.location.replace('login.html');
+      setAuthStateUI(false);
       return;
     }
+
+    setAuthStateUI(true);
 
     // Immediate UI placeholder until Firestore loads
     setupUserUI(user, {
@@ -1769,7 +1787,8 @@ logoutBtn?.addEventListener('click', async () => {
       filesUnsubscribe = null;
     }
     await logOut();
-    window.location.replace('login.html');
+    setAuthStateUI(false);
+    showToast('Signed out successfully');
   } catch (err) { alert(err.message || 'Logout failed.'); }
 });
 
@@ -1997,5 +2016,25 @@ document.querySelectorAll('.modal-close').forEach((btn) => {
 document.querySelectorAll('.modal-backdrop').forEach((modal) => {
   modal.addEventListener('click', (e) => {
     if (e.target === modal) modal.classList.remove('show');
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// PUBLIC LANDING PAGE LEGAL MODAL CONTROLS
+// ══════════════════════════════════════════════════════════════════════════════
+$('openTermsLink')?.addEventListener('click', (e) => {
+  e.preventDefault();
+  $('termsModal')?.classList.add('show');
+});
+
+$('openPrivacyLink')?.addEventListener('click', (e) => {
+  e.preventDefault();
+  $('privacyModal')?.classList.add('show');
+});
+
+['openAboutLink', 'openAboutBtn'].forEach((id) => {
+  $(id)?.addEventListener('click', (e) => {
+    e.preventDefault();
+    $('aboutModal')?.classList.add('show');
   });
 });

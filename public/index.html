@@ -67,7 +67,323 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 </head>
 <body>
-  <div class="app-container">
+  <!-- ======================================================================
+       PUBLIC SEO LANDING PAGE (Unauthenticated & Search Engine Crawlers)
+       ====================================================================== -->
+  <div id="publicLandingPage" class="public-landing-page">
+    <!-- PUBLIC HEADER -->
+    <header class="landing-header">
+      <div class="landing-header-container">
+        <a href="/" class="brand-logo">
+          <img src="https://i.postimg.cc/VL9RBtWh/Elegant-AI-Agency-Logo-for-Zulora-20260208-153446-0000.png" alt="Zulora Drive Logo" class="brand-logo-img">
+          <span class="brand-name">
+            Zulora Drive
+            <span class="brand-badge-tag">Cloud</span>
+          </span>
+        </a>
+
+        <nav class="landing-nav-links" aria-label="Landing Navigation">
+          <a href="#features" class="landing-nav-link">Features</a>
+          <a href="#pricing" class="landing-nav-link">Pricing Plans</a>
+          <a href="#about" class="landing-nav-link" id="openAboutBtn">About Us</a>
+          <a href="#contact" class="landing-nav-link">Support</a>
+        </nav>
+
+        <div class="landing-header-actions">
+          <a href="login.html" class="btn btn-secondary">Sign In</a>
+          <a href="login.html" class="btn btn-azure-gradient">
+            <i class="fa-solid fa-cloud-arrow-up"></i>
+            <span>Get Started</span>
+          </a>
+        </div>
+      </div>
+    </header>
+
+    <!-- HERO SECTION -->
+    <section class="landing-hero">
+      <div class="landing-hero-badge">
+        <i class="fa-solid fa-bolt"></i>
+        <span>Powered by Zulora AI Ecosystem · High-Performance Cloud</span>
+      </div>
+      <h1 class="landing-hero-title">
+        Zulora Drive — <span>Next-Gen Fast & Secure Free Cloud Storage</span>
+      </h1>
+      <p class="landing-hero-desc">
+        Store, sync, and share your photos, 4K videos, documents, and business archives with instant file encryption and high-speed cloud infrastructure. Get started with 10 GB free cloud storage today.
+      </p>
+      <div class="landing-hero-actions">
+        <a href="login.html" class="btn btn-azure-gradient btn-lg">
+          <i class="fa-solid fa-cloud-arrow-up"></i>
+          <span>Upload Files Free (10 GB)</span>
+        </a>
+        <a href="login.html" class="btn btn-secondary btn-lg">
+          <i class="fa-solid fa-folder-open"></i>
+          <span>Access Storage / Sign In</span>
+        </a>
+      </div>
+      <div class="landing-trust-bar">
+        <div class="landing-trust-item">
+          <i class="fa-solid fa-shield-halved"></i>
+          <span>256-Bit File Encryption</span>
+        </div>
+        <div class="landing-trust-item">
+          <i class="fa-solid fa-gauge-high"></i>
+          <span>Lightning CDN Sync</span>
+        </div>
+        <div class="landing-trust-item">
+          <i class="fa-solid fa-database"></i>
+          <span>10 GB Free Storage</span>
+        </div>
+        <div class="landing-trust-item">
+          <i class="fa-brands fa-whatsapp"></i>
+          <span>Priority WhatsApp Help: +91 6395211325</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- FEATURES SECTION -->
+    <section id="features" class="landing-section">
+      <div class="landing-section-header">
+        <span class="landing-section-badge">Platform Capabilities</span>
+        <h2 class="landing-section-title">Engineered for Speed, Security & Massive Scale</h2>
+        <p class="landing-section-subtitle">Zulora Drive combines enterprise security with lightning-fast cloud transfers for personal and business files.</p>
+      </div>
+
+      <div class="landing-features-grid">
+        <div class="landing-feature-card">
+          <div class="landing-feature-icon">
+            <i class="fa-solid fa-lock"></i>
+          </div>
+          <h3 class="landing-feature-title">End-to-End File Encryption</h3>
+          <p class="landing-feature-desc">All files uploaded to Zulora Drive are secured with multi-layered encryption and strict per-user tenant isolation to keep your data private.</p>
+        </div>
+
+        <div class="landing-feature-card">
+          <div class="landing-feature-icon">
+            <i class="fa-solid fa-bolt"></i>
+          </div>
+          <h3 class="landing-feature-title">Lightning Cloud Sync</h3>
+          <p class="landing-feature-desc">Experience rapid file uploads and downloads powered by a global edge delivery network with resumable transfers and zero pipeline freezes.</p>
+        </div>
+
+        <div class="landing-feature-card">
+          <div class="landing-feature-icon">
+            <i class="fa-solid fa-hard-drive"></i>
+          </div>
+          <h3 class="landing-feature-title">Generous Storage Limits</h3>
+          <p class="landing-feature-desc">Enjoy a generous 10 GB free starter quota, earn +5 GB per referral, or seamlessly expand with affordable paid storage plans up to 1 TB.</p>
+        </div>
+
+        <div class="landing-feature-card">
+          <div class="landing-feature-icon">
+            <i class="fa-solid fa-laptop-code"></i>
+          </div>
+          <h3 class="landing-feature-title">Cross-Platform Accessibility</h3>
+          <p class="landing-feature-desc">Access your files smoothly across Web, Android, iOS, Windows, and Mac with an intuitive interface and responsive layout.</p>
+        </div>
+
+        <div class="landing-feature-card">
+          <div class="landing-feature-icon">
+            <i class="fa-solid fa-magnifying-glass"></i>
+          </div>
+          <h3 class="landing-feature-title">Dynamic Search & Starred</h3>
+          <p class="landing-feature-desc">Find photos, documents, and videos instantly with real-time search filtering, categorized views, and one-click bookmarking.</p>
+        </div>
+
+        <div class="landing-feature-card">
+          <div class="landing-feature-icon">
+            <i class="fa-brands fa-whatsapp"></i>
+          </div>
+          <h3 class="landing-feature-title">Priority WhatsApp Support</h3>
+          <p class="landing-feature-desc">Have a question or need instant plan activation? Contact our dedicated support desk directly via WhatsApp at +91 6395211325.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- PRICING SECTION -->
+    <section id="pricing" class="landing-section">
+      <div class="landing-section-header">
+        <span class="landing-section-badge">Flexible Quotas</span>
+        <h2 class="landing-section-title">Transparent & Affordable Cloud Storage Plans</h2>
+        <p class="landing-section-subtitle">Choose the perfect storage tier for personal files, family memories, or business assets. Upgrade anytime with easy UPI payments.</p>
+      </div>
+
+      <div class="landing-pricing-grid">
+        <!-- Starter Plan -->
+        <div class="landing-pricing-card">
+          <div class="landing-card-header">
+            <h3 class="landing-card-name">Starter</h3>
+            <div class="landing-card-price">₹0 <span>/ forever</span></div>
+            <div class="landing-card-quota">10 GB Cloud Storage</div>
+          </div>
+          <ul class="landing-card-features">
+            <li><i class="fa-solid fa-check"></i> 10 GB Free Storage Space</li>
+            <li><i class="fa-solid fa-check"></i> 500 MB Max File Size</li>
+            <li><i class="fa-solid fa-check"></i> +5 GB Bonus per Referral</li>
+            <li><i class="fa-solid fa-check"></i> Standard Cloud Sync</li>
+            <li><i class="fa-solid fa-check"></i> Web & Mobile Browser Access</li>
+          </ul>
+          <a href="login.html" class="btn btn-secondary btn-full">Get Started Free</a>
+        </div>
+
+        <!-- Storage Lite Plan -->
+        <div class="landing-pricing-card">
+          <div class="landing-card-header">
+            <h3 class="landing-card-name">Storage Lite</h3>
+            <div class="landing-card-price">₹70 <span>/ month</span></div>
+            <div class="landing-card-quota">50 GB Cloud Capacity</div>
+          </div>
+          <ul class="landing-card-features">
+            <li><i class="fa-solid fa-check"></i> 50 GB Cloud Capacity</li>
+            <li><i class="fa-solid fa-check"></i> 2 GB Max File Size</li>
+            <li><i class="fa-solid fa-check"></i> Priority Direct Sync</li>
+            <li><i class="fa-solid fa-check"></i> WhatsApp Helpline Support</li>
+            <li><i class="fa-solid fa-check"></i> Instant UPI Activation</li>
+          </ul>
+          <a href="login.html" class="btn btn-azure-gradient btn-full">Choose Lite (₹70)</a>
+        </div>
+
+        <!-- Business Pro Plan -->
+        <div class="landing-pricing-card popular">
+          <div class="landing-badge-popular">MOST POPULAR</div>
+          <div class="landing-card-header">
+            <h3 class="landing-card-name">Business Pro</h3>
+            <div class="landing-card-price">₹140 <span>/ month</span></div>
+            <div class="landing-card-quota">100 GB Cloud Capacity</div>
+          </div>
+          <ul class="landing-card-features">
+            <li><i class="fa-solid fa-check"></i> 100 GB Cloud Capacity</li>
+            <li><i class="fa-solid fa-check"></i> 5 GB Max File Size</li>
+            <li><i class="fa-solid fa-check"></i> Ultra-Fast Edge CDN</li>
+            <li><i class="fa-solid fa-check"></i> Priority WhatsApp Quota Activation</li>
+            <li><i class="fa-solid fa-check"></i> Unlimited Bandwidth</li>
+          </ul>
+          <a href="login.html" class="btn btn-azure-gradient btn-full">Choose Pro (₹140)</a>
+        </div>
+
+        <!-- Ultra Max Plan -->
+        <div class="landing-pricing-card">
+          <div class="landing-card-header">
+            <h3 class="landing-card-name">Ultra Max</h3>
+            <div class="landing-card-price">₹240 <span>/ month</span></div>
+            <div class="landing-card-quota">200 GB Vault (Up to 1 TB)</div>
+          </div>
+          <ul class="landing-card-features">
+            <li><i class="fa-solid fa-check"></i> 200 GB Secure Vault Space</li>
+            <li><i class="fa-solid fa-check"></i> Unlimited Single File Sizes</li>
+            <li><i class="fa-solid fa-check"></i> VIP Helpline (+91 6395211325)</li>
+            <li><i class="fa-solid fa-check"></i> Unlimited Devices & Sync</li>
+            <li><i class="fa-solid fa-check"></i> Enterprise SLA & Support</li>
+          </ul>
+          <a href="login.html" class="btn btn-azure-gradient btn-full">Choose Ultra (₹240)</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- PUBLIC SEO FOOTER -->
+    <footer id="contact" class="seo-footer" style="padding: 40px 20px; background: rgba(248, 250, 252, 0.95); margin-top: 50px; font-size: 14px; color: #475569; border-top: 1px solid #e2e8f0;">
+      <div style="max-width: 1200px; margin: 0 auto; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 30px;">
+        
+        <div style="flex: 1; min-width: 280px;">
+          <h3 style="color: #0ea5e9; font-size: 18px; margin-bottom: 12px; font-weight: 700;">Zulora Drive - Next-Gen Cloud Storage</h3>
+          <p style="line-height: 1.6; margin-bottom: 12px;">Zulora Drive is a premier secure cloud storage platform offering fast free cloud storage and high-capacity paid plans for personal files, office documents, and media libraries.</p>
+          <div style="display: flex; gap: 14px; margin-top: 8px;">
+            <a href="#" id="openTermsLink" style="color: #0ea5e9; text-decoration: none;">Terms & Conditions</a>
+            <span style="color: #cbd5e1;">|</span>
+            <a href="#" id="openPrivacyLink" style="color: #0ea5e9; text-decoration: none;">Privacy Policy</a>
+            <span style="color: #cbd5e1;">|</span>
+            <a href="#" id="openAboutLink" style="color: #0ea5e9; text-decoration: none;">About Us</a>
+          </div>
+        </div>
+
+        <div style="flex: 1; min-width: 280px;">
+          <h4 style="font-size: 16px; margin-bottom: 12px; font-weight: 600; color: #0f172a;">Contact & Helpline Support</h4>
+          <p style="margin-bottom: 6px;">📧 Email: <a href="mailto:zulora.help@gmail.com" style="color: #0ea5e9; text-decoration: none;">zulora.help@gmail.com</a></p>
+          <p style="margin-bottom: 6px;">💬 WhatsApp Assistance: <a href="https://wa.me/916395211325" target="_blank" style="color: #0ea5e9; text-decoration: none;">+91 6395211325</a></p>
+          <p style="margin-top: 10px; font-weight: 500;">⚡ Powered by Zulora AI Ecosystem</p>
+        </div>
+
+        <div style="flex: 1; min-width: 280px;">
+          <h4 style="font-size: 16px; margin-bottom: 12px; font-weight: 600; color: #0f172a;">Popular Cloud Categories</h4>
+          <p style="line-height: 1.6;">Free Cloud Storage Services | Best Paid Cloud Storage India | Dynamic File Sharing | Unlimited Cloud Sync | Secure File Encryption</p>
+          <p style="margin-top: 12px; font-size: 12px; opacity: 0.85; line-height: 1.5;">#ZuloraDrive #CloudStorage #FreeCloudStorage #PaidCloudStorage #ZuloraAI #SecureCloud</p>
+          <p style="margin-top: 10px; font-size: 12px; color: #94a3b8;">© 2026 Zulora Drive. All rights reserved.</p>
+        </div>
+
+      </div>
+    </footer>
+
+    <!-- MODAL: TERMS & CONDITIONS -->
+    <div id="termsModal" class="modal-backdrop">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h2 class="modal-title"><i class="fa-solid fa-scale-balanced"></i> Terms & Conditions</h2>
+          <button class="modal-close" data-close-modal="termsModal">&times;</button>
+        </div>
+        <div class="modal-body" style="max-height: 60vh; overflow-y: auto; line-height: 1.6; color: #334155;">
+          <h3 style="font-size: 1.1rem; margin-bottom: 8px; color: #0f172a;">1. Acceptance of Terms</h3>
+          <p style="margin-bottom: 14px;">By accessing and using Zulora Drive (https://drive.zulora.in/), you agree to comply with and be bound by these terms. Zulora Drive offers cloud storage and synchronization services subject to fair usage policies.</p>
+          
+          <h3 style="font-size: 1.1rem; margin-bottom: 8px; color: #0f172a;">2. Storage Quotas & Free Tier</h3>
+          <p style="margin-bottom: 14px;">The Starter plan provides 10 GB of free cloud storage with a 500 MB maximum single-file upload limit. Users can earn additional storage (+5 GB per valid referral) or subscribe to paid plans (Storage Lite ₹70, Business Pro ₹140, Ultra Max ₹240).</p>
+
+          <h3 style="font-size: 1.1rem; margin-bottom: 8px; color: #0f172a;">3. Acceptable Use Policy</h3>
+          <p style="margin-bottom: 14px;">Users are solely responsible for the content uploaded to their storage vaults. Uploading illegal materials, malware, copyrighted works without authorization, or violating any applicable Indian or international law will result in immediate account termination.</p>
+
+          <h3 style="font-size: 1.1rem; margin-bottom: 8px; color: #0f172a;">4. Payment & Activation</h3>
+          <p style="margin-bottom: 14px;">Paid storage upgrades are processed via UPI or designated payment channels. Storage quota upgrades are activated after verification via our official WhatsApp desk (+91 6395211325) or email (zulora.help@gmail.com).</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL: PRIVACY POLICY -->
+    <div id="privacyModal" class="modal-backdrop">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h2 class="modal-title"><i class="fa-solid fa-shield-halved"></i> Privacy Policy</h2>
+          <button class="modal-close" data-close-modal="privacyModal">&times;</button>
+        </div>
+        <div class="modal-body" style="max-height: 60vh; overflow-y: auto; line-height: 1.6; color: #334155;">
+          <h3 style="font-size: 1.1rem; margin-bottom: 8px; color: #0f172a;">1. Information We Collect</h3>
+          <p style="margin-bottom: 14px;">We collect your email address, display name, and uploaded file metadata necessary to provide secure cloud storage and synchronization services. We do not sell or monetize personal customer records.</p>
+          
+          <h3 style="font-size: 1.1rem; margin-bottom: 8px; color: #0f172a;">2. File Security & Isolation</h3>
+          <p style="margin-bottom: 14px;">Each user's files are strictly compartmentalized in isolated user directories with encrypted transmission channels. Only authenticated users can access their stored files.</p>
+
+          <h3 style="font-size: 1.1rem; margin-bottom: 8px; color: #0f172a;">3. Third-Party Infrastructure</h3>
+          <p style="margin-bottom: 14px;">Authentication and real-time database functions are handled via Google Firebase, and file storage pipelines are accelerated through secure edge CDN providers.</p>
+
+          <h3 style="font-size: 1.1rem; margin-bottom: 8px; color: #0f172a;">4. Contacting Us</h3>
+          <p style="margin-bottom: 14px;">For any privacy inquiries or data requests, please write to zulora.help@gmail.com or contact us via WhatsApp at +91 6395211325.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL: ABOUT US -->
+    <div id="aboutModal" class="modal-backdrop">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h2 class="modal-title"><i class="fa-solid fa-circle-info"></i> About Zulora Drive</h2>
+          <button class="modal-close" data-close-modal="aboutModal">&times;</button>
+        </div>
+        <div class="modal-body" style="max-height: 60vh; overflow-y: auto; line-height: 1.6; color: #334155;">
+          <h3 style="font-size: 1.1rem; margin-bottom: 8px; color: #0f172a;">Next-Gen Cloud Storage Platform</h3>
+          <p style="margin-bottom: 14px;">Zulora Drive (https://drive.zulora.in/) is engineered to provide affordable, lightning-fast, and secure cloud storage solutions designed for Indian consumers, creators, students, and businesses.</p>
+
+          <h3 style="font-size: 1.1rem; margin-bottom: 8px; color: #0f172a;">Part of the Zulora AI Ecosystem</h3>
+          <p style="margin-bottom: 14px;">Built with high-performance distributed systems, Zulora Drive delivers seamless cross-device syncing, instant file previews, dynamic storage reclamation, and prompt customer support.</p>
+
+          <h3 style="font-size: 1.1rem; margin-bottom: 8px; color: #0f172a;">Customer Support & Verification</h3>
+          <p style="margin-bottom: 14px;">Our team is directly reachable via official WhatsApp (+91 6395211325) and email (zulora.help@gmail.com) for swift inquiries, plan customizations, and account support.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================================
+       AUTHENTICATED APPLICATION DASHBOARD (Clean File Workspace)
+       ====================================================================== -->
+  <div id="appContainer" class="app-container" style="display: none;">
     <!-- APP HEADER / TOPBAR (Google Drive Hybrid Style) -->
     <header class="app-header">
       <div class="header-left">
@@ -685,7 +1001,7 @@
   </div>
 
   <!-- MOBILE BOTTOM NAVIGATION (Google Drive Mobile Style) -->
-  <nav class="mobile-bottom-nav" aria-label="Mobile Navigation">
+  <nav class="mobile-bottom-nav" id="mobileBottomNav" aria-label="Mobile Navigation" style="display: none;">
     <button class="mobile-nav-btn active" data-mobile-nav="my-drive">
       <i class="fa-solid fa-folder"></i>
       <span>Files</span>
@@ -712,30 +1028,5 @@
 
   <!-- PRIMARY APP SCRIPT -->
   <script type="module" src="app.js"></script>
-
-  <!-- SEO-OPTIMIZED PUBLIC FOOTER -->
-  <footer class="seo-footer" style="padding: 30px 20px; background: rgba(248, 250, 252, 0.8); margin-top: 50px; font-size: 14px; color: #475569; border-top: 1px solid #e2e8f0;">
-    <div style="max-width: 1200px; margin: 0 auto; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 20px;">
-      
-      <div style="flex: 1; min-width: 280px;">
-        <h3 style="color: #0ea5e9; font-size: 18px; margin-bottom: 10px;">Zulora Drive - Next-Gen Cloud Storage</h3>
-        <p>Zulora Drive is a premier secure cloud storage platform offering fast free cloud storage and high-capacity paid plans for personal files, office documents, and media libraries.</p>
-      </div>
-
-      <div style="flex: 1; min-width: 280px;">
-        <h4 style="font-size: 16px; margin-bottom: 10px;">Contact & Helpline Support</h4>
-        <p>📧 Email: <a href="mailto:zulora.help@gmail.com" style="color: #0ea5e9;">zulora.help@gmail.com</a></p>
-        <p>💬 WhatsApp Assistance: <a href="https://wa.me/916395211325" style="color: #0ea5e9;">+91 6395211325</a></p>
-        <p>⚡ Powered by Zulora AI Ecosystem</p>
-      </div>
-
-      <div style="flex: 1; min-width: 280px;">
-        <h4 style="font-size: 16px; margin-bottom: 10px;">Popular Cloud Categories</h4>
-        <p>Free Cloud Storage Services | Best Paid Cloud Storage India | Dynamic File Sharing | Unlimited Cloud Sync | Secure File Encryption</p>
-        <p style="margin-top: 10px; font-size: 12px; opacity: 0.8;">#ZuloraDrive #CloudStorage #FreeCloudStorage #PaidCloudStorage #ZuloraAI #SecureCloud</p>
-      </div>
-
-    </div>
-  </footer>
 </body>
 </html>
