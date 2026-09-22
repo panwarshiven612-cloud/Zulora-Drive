@@ -200,6 +200,7 @@ a {
 .brand-logo-img {
   width: 34px;
   height: 34px;
+  max-height: 36px;
   object-fit: contain;
   border-radius: 8px;
 }
@@ -2257,6 +2258,8 @@ a {
     top: var(--header-height);
     bottom: 0;
     left: -100%;
+    width: 80vw;
+    max-width: 300px;
     box-shadow: var(--shadow-xl);
     transition: left var(--transition-normal);
   }
@@ -2273,6 +2276,82 @@ a {
   .btn-whatsapp-header span,
   .btn-upgrade-header span {
     display: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .app-header {
+    min-height: var(--header-height);
+    height: auto;
+    padding: 8px 12px;
+    gap: 8px;
+  }
+
+  .header-left,
+  .header-right {
+    min-width: 0;
+    flex-shrink: 1;
+    gap: 6px;
+  }
+
+  .brand-logo {
+    min-width: 0;
+    gap: 6px;
+    font-size: 1rem;
+    white-space: nowrap;
+  }
+
+  .brand-logo-img {
+    width: auto;
+    max-height: 36px;
+    height: 36px;
+  }
+
+  .brand-badge-tag {
+    display: none;
+  }
+
+  .header-action-btn {
+    flex: 0 0 auto;
+    height: 34px;
+    padding: 0 9px;
+    white-space: nowrap;
+  }
+
+  .header-action-btn span {
+    display: none;
+  }
+
+  .header-right {
+    justify-content: flex-end;
+  }
+
+  .filter-chips-wrapper {
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    overscroll-behavior-x: contain;
+  }
+
+  .filter-chips-wrapper::-webkit-scrollbar {
+    display: none;
+  }
+
+  .app-body:has(.app-sidebar.open)::before {
+    content: '';
+    position: fixed;
+    inset: var(--header-height) 0 0;
+    background: rgba(15, 23, 42, 0.28);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    z-index: 20;
+    pointer-events: none;
+  }
+
+  .app-sidebar {
+    width: 80vw;
+    max-width: 300px;
   }
 }
 
