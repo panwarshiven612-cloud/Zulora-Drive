@@ -53,6 +53,7 @@ export const DEFAULT_STORAGE_BYTES   = 10 * 1024 * 1024 * 1024; // 10 GB Free St
 export const MAX_STARTER_FILE_BYTES  = 500 * 1024 * 1024;        // 500 MB max per file (Starter)
 export const REFERRAL_BONUS_BYTES    = 5 * 1024 * 1024 * 1024;   // +5 GB per referral
 
+// ── Cloudinary Configuration ──────────────────────────────────────────────────
 // ── Disposable / Temp-Mail Domain Blacklist ───────────────────────────────────
 /**
  * Comprehensive blacklist of known disposable, temporary, and throwaway email
@@ -525,6 +526,7 @@ export async function signInWithGoogle() {
 }
 
 export const signInWithEmail    = (email, pwd) => signInWithEmailAndPassword(auth, email, pwd);
+export const registerWithEmail  = (email, pwd) => createUserWithEmailAndPassword(auth, email, pwd);
 export const resetPassword      = (email)      => sendPasswordResetEmail(auth, email);
 
 /**

@@ -770,6 +770,7 @@ function initAuthLifecycle() {
     // Immediate UI placeholder until Firestore loads
     setupUserUI(user, {
       email:       user.email,
+      displayName: user.displayName || user.email.split('@')[0],
       displayName: user.displayName || (user.email ? user.email.split('@')[0] : 'User'),
       username:    deriveUsername(user),
       accountId:   deriveAccountId(user)

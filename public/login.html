@@ -3,7 +3,50 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Zulora Drive — Sign In & Authentication</title>
+  <title>Zulora Drive — Best Free Cloud Storage &amp; Fast Encrypted Cloud Drive</title>
+  <meta name="title" content="Zulora Drive — Best Free Cloud Storage &amp; Fast Encrypted Cloud Drive">
+  <meta name="description" content="Experience fast, secure, and encrypted cloud storage with Zulora Drive. Get reliable free cloud storage, fast sync, easy file sharing, and seamless online drive access.">
+  <meta name="keywords" content="best cloud storage facility, best and cheapest cloud storage services, free cloud storage service, best cloud storage service, cloud storage online drive, google drive alternative, secure cloud backup, fast cloud sync, Zulora Drive">
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
+  <link rel="canonical" href="https://drive.zulora.in/">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://drive.zulora.in/">
+  <meta property="og:title" content="Zulora Drive — Best Free Cloud Storage &amp; Fast Encrypted Cloud Drive">
+  <meta property="og:description" content="Experience fast, secure, and encrypted cloud storage with Zulora Drive. Get reliable free cloud storage, fast sync, easy file sharing, and seamless online drive access.">
+  <meta property="og:image" content="https://drive.zulora.in/preview-banner.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Zulora Drive — Best Free Cloud Storage &amp; Fast Encrypted Cloud Drive">
+  <meta name="twitter:description" content="Experience fast, secure, and encrypted cloud storage with Zulora Drive. Get reliable free cloud storage, fast sync, easy file sharing, and seamless online drive access.">
+  <meta name="twitter:image" content="https://drive.zulora.in/preview-banner.png">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "SoftwareApplication",
+        "name": "Zulora Drive",
+        "operatingSystem": "All",
+        "applicationCategory": "BusinessApplication",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        },
+        "description": "Reliable, encrypted free cloud storage and fast file sharing service.",
+        "url": "https://drive.zulora.in/"
+      },
+      {
+        "@type": "WebSite",
+        "url": "https://drive.zulora.in/",
+        "potentialAction": {
+          "@type": "SearchAction",
+          "target": "https://drive.zulora.in/?q={search_term_string}",
+          "query-input": "required name=search_term_string"
+        }
+      }
+    ]
+  }
+  </script>
   <!-- Preconnect and DNS-Prefetch Resource Hints -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -31,6 +74,7 @@
 </head>
 <body class="auth-page">
   <div class="auth-wrapper">
+    <div class="auth-card">
     <div class="auth-card" id="authCard">
       <!-- BRAND HEADER -->
       <div class="auth-brand">
@@ -107,6 +151,7 @@
       resendVerificationEmail,
       resetPassword,
       onAuthChange,
+      friendlyAuthError
       friendlyAuthError,
       isDisposableEmail
     } from './auth.js';
@@ -115,12 +160,14 @@
 
     let isSignUp = false;
 
+    // Redirect logged in users directly to index.html
     // ── Track pending-verification state ──────────────────────────────────────
     let pendingEmail    = null;
     let pendingPassword = null; // Held in memory only — never persisted
 
     // ── Redirect on auth state change (verified users only) ───────────────────
     onAuthChange((user) => {
+      if (user) {
       // Google users are always verified; email users must pass emailVerified check
       if (user && user.emailVerified) {
         window.location.replace('index.html');
@@ -132,6 +179,13 @@
       }
     });
 
+    const tabSignIn = document.getElementById('tabSignIn');
+    const tabSignUp = document.getElementById('tabSignUp');
+    const nameGroup = document.getElementById('nameGroup');
+    const authForm = document.getElementById('authForm');
+    const authSubmitBtn = document.getElementById('authSubmitBtn');
+    const authAlert = document.getElementById('authAlert');
+    const googleSignInBtn = document.getElementById('googleSignInBtn');
     // ── Handle ?verified=1 redirect from the verification email link ──────────
     if (new URLSearchParams(window.location.search).get('verified') === '1') {
       showAlert(
@@ -148,8 +202,10 @@
     const authAlert         = document.getElementById('authAlert');
     const googleSignInBtn   = document.getElementById('googleSignInBtn');
     const forgotPasswordBtn = document.getElementById('forgotPasswordBtn');
+    const forgotRow = document.getElementById('forgotRow');
     const forgotRow         = document.getElementById('forgotRow');
     const toggleAuthModeBtn = document.getElementById('toggleAuthModeBtn');
+    const authFooterText = document.getElementById('authFooterText');
     const authFooterText    = document.getElementById('authFooterText');
     const authCard          = document.getElementById('authCard');
 
@@ -186,10 +242,12 @@
 
     function showAlert(message, type = 'danger') {
       authAlert.className = `auth-alert ${type}`;
+      authAlert.textContent = message;
       authAlert.innerHTML = message;
       authAlert.style.display = 'block';
     }
 
+    // Google Auth
     // ── Verification Pending Screen ───────────────────────────────────────────
     function showVerifyPendingScreen(email) {
       const existing = document.getElementById('verifyPendingScreen');
@@ -322,17 +380,20 @@
       authAlert.style.display = 'none';
       try {
         await signInWithGoogle();
+        // Redirect handled by onAuthChange
         // Redirect handled by onAuthChange (Google users are always verified)
       } catch (err) {
         showAlert(friendlyAuthError(err));
       }
     });
 
+    // Form Submit (Email / Password)
     // ── Form Submit (Email / Password) ────────────────────────────────────────
     authForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       authAlert.style.display = 'none';
 
+      const email = document.getElementById('authEmail').value.trim();
       const email    = document.getElementById('authEmail').value.trim();
       const password = document.getElementById('authPassword').value;
 
@@ -353,6 +414,7 @@
 
       try {
         if (isSignUp) {
+          await registerWithEmail(email, password);
           // Secure registration — returns { verificationSent: true, email }
           const result = await registerWithEmail(email, password);
           if (result && result.verificationSent) {
@@ -366,6 +428,7 @@
           // Redirect handled by onAuthChange for verified users
         }
       } catch (err) {
+        showAlert(friendlyAuthError(err));
         // Show specific message for disposable email errors
         if (err.code === 'DISPOSABLE_EMAIL') {
           showAlert(
@@ -376,12 +439,16 @@
           showAlert(friendlyAuthError(err));
         }
         authSubmitBtn.disabled = false;
+        authSubmitBtn.querySelector('span')
+          ? (authSubmitBtn.querySelector('span').textContent = isSignUp ? 'Create Account' : 'Sign In')
+          : (authSubmitBtn.textContent = isSignUp ? 'Create Account' : 'Sign In');
         const spanEl = authSubmitBtn.querySelector('span');
         if (spanEl) spanEl.textContent = isSignUp ? 'Create Account' : 'Sign In';
         else authSubmitBtn.textContent = isSignUp ? 'Create Account' : 'Sign In';
       }
     });
 
+    // Password Reset
     // ── Password Reset ────────────────────────────────────────────────────────
     forgotPasswordBtn.addEventListener('click', async (e) => {
       e.preventDefault();
@@ -394,6 +461,7 @@
 
       try {
         await resetPassword(email);
+        showAlert(`Password reset email sent to ${email}. Please check your inbox.`, 'success');
         showAlert(`Password reset email sent to ${escHtml(email)}. Please check your inbox.`, 'success');
       } catch (err) {
         showAlert(friendlyAuthError(err));
