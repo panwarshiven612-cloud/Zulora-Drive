@@ -34,6 +34,7 @@ import {
   SUPPORT_UPI_ID,
   DEFAULT_STORAGE_BYTES,
   MAX_STARTER_FILE_BYTES,
+  validateUploadFile,
   deriveUsername,
   deriveAccountId,
   getReferralLink,
@@ -360,7 +361,7 @@ function setupUserUI(user, prof) {
 
   if (user?.photoURL) {
     if (userAvatarBtn) {
-      userAvatarBtn.innerHTML = `<img src="${user.photoURL}" alt="${displayName}"
+      userAvatarBtn.innerHTML = `<img src="${sanitizeUrl(user.photoURL)}" alt="${escHtml(displayName)}"
         style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
     }
   } else {
@@ -444,7 +445,7 @@ function renderFileList(fileDocs) {
     const fName = d.fileName || d.name || d.originalName || 'Untitled File';
     const fSize = Number(d.fileSize ?? d.size ?? 0);
     const fType = d.fileType || d.type || d.mimetype || 'application/octet-stream';
-    const fUrl  = d.fileUrl  || d.url  || '';
+    const fUrl  = sanitizeUrl(d.fileUrl || d.url || '');
 
     return {
       id:                 d.id,
@@ -902,14 +903,14 @@ function createFileCardElement(file) {
   card.dataset.fileId = file.id;
 
   const fName = file.fileName || file.name || 'Untitled File';
-  const fUrl  = file.fileUrl  || file.url  || '';
+  const fUrl  = sanitizeUrl(file.fileUrl || file.url || '');
   const fSize = Number(file.fileSize ?? file.size ?? 0);
   const isTrashed = Boolean(file.isTrashed || file.isTrash);
 
   card.innerHTML = `
     <div class="file-card-preview-box">
       ${isImg && fUrl
-        ? `<img src="${fUrl}" alt="${escHtml(fName)}" class="file-card-thumb" loading="lazy">`
+        ? `<img src="${escHtml(fUrl)}" alt="${escHtml(fName)}" class="file-card-thumb" loading="lazy">`
         : `<i class="${meta.icon} file-card-icon-large" style="color:${meta.color};"></i>`}
     </div>
     <div class="file-card-actions">
@@ -1134,6 +1135,17 @@ function escHtml(str) {
   return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+function sanitizeUrl(value) {
+  try {
+    const url = new URL(String(value || ''), window.location.origin);
+    return ['http:', 'https:', 'blob:'].includes(url.protocol) ? url.href : '';
+  } catch {
+    return '';
+  }
+}
+  const fUrl  = sanitizeUrl(file.fileUrl || file.url || '');
+  ? `<img src="${escHtml(fUrl)}" alt="${escHtml(fName)}" class="file-card-thumb" loading="lazy">`
+
 // ══════════════════════════════════════════════════════════════════════════════
 // FILE ACTIONS
 // ══════════════════════════════════════════════════════════════════════════════
@@ -1142,7 +1154,7 @@ function escHtml(str) {
 function openPreviewModal(file) {
   selectedFile = file;
   const name   = file.fileName || file.originalName || file.name || 'File Preview';
-  const url    = file.fileUrl || file.url;
+  const url    = sanitizeUrl(file.fileUrl || file.url);
 
   if (previewTitle)       previewTitle.textContent = name;
   if (previewDownloadBtn) { previewDownloadBtn.href = url; previewDownloadBtn.download = name; }
@@ -1746,6 +1758,13 @@ async function uploadFilesBatch(files) {
     for (const file of files) {
       const limit = Number(profile?.storageLimitBytes || profile?.storageLimit || DEFAULT_STORAGE_BYTES);
       const used  = Number(profile?.storageUsedBytes || profile?.usedStorageBytes || profile?.storageUsed || 0);
+
+      try {
+        validateUploadFile(file);
+      } catch (validationError) {
+        alert(validationError.message);
+        continue;
+      }
 
       // 500 MB single-file limit for Starter plan (10 GB default)
       if (limit <= DEFAULT_STORAGE_BYTES && file.size > MAX_STARTER_FILE_BYTES) {

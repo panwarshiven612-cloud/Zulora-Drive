@@ -157,14 +157,30 @@ export function getReferralLink(user) {
 export function getReferrerUidFromUrl() {
   try {
     const params = new URLSearchParams(window.location.search);
-    const ref    = params.get('ref');
+    const ref    = params.get('ref') || params.get('referrer');
     if (ref && /^[A-Za-z0-9_-]{4,}$/.test(ref)) {
-      localStorage.setItem('zulora_referrer_uid', ref);
+      localStorage.setItem('zulora_pending_referrer', ref);
       return ref;
     }
-    return localStorage.getItem('zulora_referrer_uid') || null;
+    return localStorage.getItem('zulora_pending_referrer') || null;
   } catch {
     return null;
+  }
+}
+
+// Capture referral links as soon as the auth module loads, before sign-in.
+getReferrerUidFromUrl();
+
+const BLOCKED_UPLOAD_EXTENSIONS = new Set(['exe', 'bat', 'sh', 'php', 'js', 'html']);
+
+export function validateUploadFile(file) {
+  if (!file || typeof file.name !== 'string') throw new Error('Invalid upload file.');
+  const extension = file.name.includes('.') ? file.name.split('.').pop().toLowerCase() : '';
+  if (BLOCKED_UPLOAD_EXTENSIONS.has(extension)) {
+    throw new Error('Executable and script files are not allowed.');
+  }
+  if (Number(file.size) > MAX_STARTER_FILE_BYTES) {
+    throw new Error('This file exceeds the 500 MB maximum file size.');
   }
 }
 
@@ -181,6 +197,12 @@ export function getReferrerUidFromUrl() {
  */
 export function uploadFileToCloudinary(file, onProgress) {
   return new Promise((resolve, reject) => {
+    try {
+      validateUploadFile(file);
+    } catch (err) {
+      reject(err);
+      return;
+    }
     const activeUser = auth.currentUser || currentUser;
     if (!activeUser) {
       return reject(Object.assign(new Error('Please sign in first!'), { code: 'UNAUTHENTICATED' }));
@@ -396,11 +418,9 @@ export async function bootstrapUser() {
         console.warn('[Zulora] Firestore setDoc notice:', err.message);
       }
 
-      // Apply referral bonuses immediately (+5 GB to both parties)
+      // Apply referral bonuses atomically and clear the pending claim only after success.
       if (referrerUid && referrerUid !== user.uid) {
-        applyReferralBonus(user.uid, referrerUid).catch((e) =>
-          console.warn('[Zulora] Referral bonus notice:', e.message)
-        );
+        await applyReferralBonus(user.uid, referrerUid);
       }
 
       currentProfile = {
@@ -450,39 +470,40 @@ function buildProfile(user, d) {
  * Idempotent — guarded by referralProcessed flag.
  */
 async function applyReferralBonus(newUserUid, referrerUid) {
-  try {
-    const newUserRef  = doc(db, 'users', newUserUid);
-    const referrerRef = doc(db, 'users', referrerUid);
+  if (!referrerUid || referrerUid === newUserUid) return false;
+  const claimRef = doc(db, 'referrals', `${newUserUid}_${referrerUid}`);
+  const newUserRef = doc(db, 'users', newUserUid);
+  const referrerRef = doc(db, 'users', referrerUid);
 
-    await runTransaction(db, async (tx) => {
-      const [newSnap, refSnap] = await Promise.all([tx.get(newUserRef), tx.get(referrerRef)]);
-      if (!newSnap.exists() || !refSnap.exists()) return;
-      if (newSnap.data().referralProcessed) return; // Already processed
+  const rewardApplied = await runTransaction(db, async (tx) => {
+    const [claimSnap, newSnap, refSnap] = await Promise.all([
+      tx.get(claimRef), tx.get(newUserRef), tx.get(referrerRef)
+    ]);
+    if (claimSnap.exists()) return true;
+    if (!newSnap.exists() || !refSnap.exists()) return false;
 
-      const newLimit = Number(newSnap.data().storageLimitBytes || DEFAULT_STORAGE_BYTES) + REFERRAL_BONUS_BYTES;
-      const refLimit = Number(refSnap.data().storageLimitBytes || DEFAULT_STORAGE_BYTES) + REFERRAL_BONUS_BYTES;
-
-      tx.update(newUserRef, {
-        storageLimitBytes:  newLimit,
-        storageLimit:       newLimit,
-        referralBonusBytes: increment(REFERRAL_BONUS_BYTES),
-        referralProcessed:  true,
-        updatedAt:          serverTimestamp()
-      });
-
-      tx.update(referrerRef, {
-        storageLimitBytes:  refLimit,
-        storageLimit:       refLimit,
-        referralBonusBytes: increment(REFERRAL_BONUS_BYTES),
-        totalReferrals:     increment(1),
-        updatedAt:          serverTimestamp()
-      });
+    const newLimit = Number(newSnap.data().storageLimitBytes || DEFAULT_STORAGE_BYTES) + REFERRAL_BONUS_BYTES;
+    const refLimit = Number(refSnap.data().storageLimitBytes || DEFAULT_STORAGE_BYTES) + REFERRAL_BONUS_BYTES;
+    tx.set(claimRef, {
+      newUserUid, referrerUid, rewardBytes: REFERRAL_BONUS_BYTES, createdAt: serverTimestamp()
     });
+    tx.update(newUserRef, {
+      storageLimitBytes: newLimit, storageLimit: newLimit,
+      referralBonusBytes: increment(REFERRAL_BONUS_BYTES), referredBy: referrerUid,
+      referralProcessed: true, updatedAt: serverTimestamp()
+    });
+    tx.update(referrerRef, {
+      storageLimitBytes: refLimit, storageLimit: refLimit,
+      referralBonusBytes: increment(REFERRAL_BONUS_BYTES), totalReferrals: increment(1),
+      lastReferralUid: newUserUid,
+      updatedAt: serverTimestamp()
+    });
+    return true;
+  });
 
-    console.info(`[Zulora] Referral bonus applied — new: ${newUserUid}, referrer: ${referrerUid}`);
-  } catch (err) {
-    console.warn('[Zulora] Referral transaction notice:', err.message);
-  }
+  if (rewardApplied) localStorage.removeItem('zulora_pending_referrer');
+  console.info(`[Zulora] Referral bonus applied — new: ${newUserUid}, referrer: ${referrerUid}`);
+  return true;
 }
 
 /** Refresh profile data from Firestore (called periodically) */

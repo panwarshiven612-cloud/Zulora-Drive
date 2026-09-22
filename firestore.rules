@@ -26,7 +26,6 @@ service cloud.firestore {
 
     /** Caller is the Zulora admin account */
     function isAdmin() {
-      return isAuthenticated() && request.auth.token.email.lower() == 'zulora.help@gmail.com';
       return isAuthenticated() &&
              request.auth.token.email != null &&
              request.auth.token.email.lower() == 'zulora.help@gmail.com';
@@ -41,16 +40,36 @@ service cloud.firestore {
 
     // ── User Profiles & Storage Metadata ──────────────────────────────────────
     match /users/{userId} {
-      allow read: if isAuthenticated();
-      allow create, update: if isOwner(userId) || isAdmin();
-      // Reads: any authenticated user can read their own profile doc.
-      //   This allows bootstrapUser() to check if the doc exists before
-      //   verification completes (needed on first sign-up).
       allow read: if isOwner(userId) || isAdmin();
-
-      // Create / Update: requires verified email to prevent unverified accounts
-      //   from persisting data to Firestore.
-      allow create, update: if isVerifiedOwner(userId);
+      allow create: if isVerifiedOwner(userId);
+      allow update: if isAdmin() || (isVerifiedOwner(userId) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'name', 'displayName', 'email', 'photoURL', 'lastLogin',
+          'storageUsedBytes', 'usedStorageBytes', 'storageUsed', 'updatedAt'
+        ]));
+      // Referral reward updates must be exact five-gigabyte increments.
+      allow update: if isVerifiedOwner(userId) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'storageLimitBytes', 'storageLimit', 'referralBonusBytes',
+          'referredBy', 'referralProcessed', 'updatedAt'
+        ]) &&
+        getAfter(/databases/$(database)/documents/referrals/$(userId + '_' + request.resource.data.referredBy)).data.newUserUid == userId &&
+        getAfter(/databases/$(database)/documents/referrals/$(userId + '_' + request.resource.data.referredBy)).data.referrerUid == request.resource.data.referredBy &&
+        request.resource.data.storageLimitBytes == resource.data.storageLimitBytes + 5368709120 &&
+        request.resource.data.storageLimit == resource.data.storageLimit + 5368709120 &&
+        request.resource.data.referralBonusBytes == resource.data.referralBonusBytes + 5368709120;
+      allow update: if isEmailVerified() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'storageLimitBytes', 'storageLimit', 'referralBonusBytes',
+          'totalReferrals', 'lastReferralUid', 'updatedAt'
+        ]) &&
+        request.resource.data.lastReferralUid != null &&
+        getAfter(/databases/$(database)/documents/referrals/$(request.resource.data.lastReferralUid + '_' + userId)).data.newUserUid == request.resource.data.lastReferralUid &&
+        getAfter(/databases/$(database)/documents/referrals/$(request.resource.data.lastReferralUid + '_' + userId)).data.referrerUid == userId &&
+        request.resource.data.storageLimitBytes == resource.data.storageLimitBytes + 5368709120 &&
+        request.resource.data.storageLimit == resource.data.storageLimit + 5368709120 &&
+        request.resource.data.referralBonusBytes == resource.data.referralBonusBytes + 5368709120 &&
+        request.resource.data.totalReferrals == resource.data.totalReferrals + 1;
 
       // Delete: admin-only hard delete
       allow delete: if isAdmin();
@@ -58,10 +77,15 @@ service cloud.firestore {
       // User files subcollection
       // ── Per-User Files Subcollection ────────────────────────────────────────
       match /files/{fileId} {
-        allow read, write: if isOwner(userId) || isAdmin();
-        // Both read and write require a verified account (owner or admin).
-        // Unverified users cannot load, upload, rename, or trash their files.
-        allow read, write: if isVerifiedOwner(userId);
+        allow read: if isVerifiedOwner(userId);
+        allow create: if isVerifiedOwner(userId) &&
+          request.resource.data.userUid == userId &&
+          request.resource.data.fileSize <= 524288000;
+        allow update: if isVerifiedOwner(userId) &&
+          resource.data.userUid == userId &&
+          request.resource.data.userUid == userId &&
+          request.resource.data.fileSize <= 524288000;
+        allow delete: if isVerifiedOwner(userId);
       }
     }
 
@@ -70,18 +94,27 @@ service cloud.firestore {
     // ── Global Files Collection ───────────────────────────────────────────────
     // Used for system-wide search, shared file links, and admin overviews.
     match /files/{fileId} {
-      // Read: any authenticated user can read (for shared link access).
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && request.resource.data.userUid == request.auth.uid;
-      allow update, delete: if isAuthenticated() && (resource.data.userUid == request.auth.uid || isAdmin());
-
-      // Create: uploader must be verified and writing their own UID.
       allow create: if isEmailVerified() &&
-                       request.resource.data.userUid == request.auth.uid;
+                       request.resource.data.userUid == request.auth.uid &&
+                       request.resource.data.fileSize <= 524288000;
+      allow read: if isEmailVerified() &&
+                  (resource.data.userUid == request.auth.uid || isAdmin());
+      allow update: if isEmailVerified() &&
+            (resource.data.userUid == request.auth.uid || isAdmin()) &&
+            (request.resource.data.fileSize <= 524288000 || isAdmin());
+      allow delete: if isEmailVerified() &&
+            (resource.data.userUid == request.auth.uid || isAdmin());
+    }
 
-      // Update / Delete: only the verified original uploader or admin.
-      allow update, delete: if isEmailVerified() &&
-                               (resource.data.userUid == request.auth.uid || isAdmin());
+    match /referrals/{referralId} {
+      allow create: if isEmailVerified() &&
+        request.resource.data.newUserUid == request.auth.uid &&
+        request.resource.data.referrerUid != request.auth.uid &&
+        request.resource.data.rewardBytes == 5368709120 &&
+        referralId == request.resource.data.newUserUid + '_' + request.resource.data.referrerUid;
+      allow read: if isAdmin() ||
+        (isEmailVerified() && (resource.data.newUserUid == request.auth.uid || resource.data.referrerUid == request.auth.uid));
+      allow update, delete: if isAdmin();
     }
 
     // Upgrade payment requests
