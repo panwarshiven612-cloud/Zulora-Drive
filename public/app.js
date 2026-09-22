@@ -743,6 +743,21 @@ function hideUnverifiedBanner() {
   if (mainWS) mainWS.style.display = '';
 }
 
+async function sendWelcomeEmailOnce(user) {
+  const welcomeKey = `zulora_welcome_sent_${user.uid}`;
+  if (localStorage.getItem(welcomeKey) || typeof emailjs === 'undefined') return;
+
+  try {
+    await emailjs.send('service_rnx73od', 'template_vjrfj7h', {
+      name: user.displayName || 'Valued User',
+      email: user.email
+    });
+    localStorage.setItem(welcomeKey, 'true');
+  } catch (err) {
+    console.warn('[Zulora] Welcome email notice:', err.message);
+  }
+}
+
 function initAuthLifecycle() {
   onAuthChange(async (user) => {
     if (!user) {
@@ -766,6 +781,7 @@ function initAuthLifecycle() {
     // ── Verified user — full dashboard access ─────────────────────────────────
     hideUnverifiedBanner();
     setAuthStateUI(true);
+    await sendWelcomeEmailOnce(user);
 
     // Immediate UI placeholder until Firestore loads
     setupUserUI(user, {
