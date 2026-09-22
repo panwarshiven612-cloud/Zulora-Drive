@@ -200,19 +200,25 @@ export function showToast(message, isError = false) {
 
 /**
  * Dynamic size formatting per specification:
- * - display in KB if under 1 MB
- * - display in MB if under 1 GB
- * - display in GB if 1 GB or larger (e.g., "450 KB / 15 GB" or "12.4 MB / 15 GB")
+ * - < 1 MB  → display in KB (e.g. "450 KB")
+ * - < 1 GB  → display in MB with 2 decimal places (e.g. "14.25 MB")
+ * - ≥ 1 GB  → display in GB with 2 decimal places (e.g. "1.50 GB")
  */
 export function formatStorageSize(bytes) {
   const b = Math.max(0, Number(bytes || 0));
   if (b === 0) return '0 KB';
-  if (b < 1024 * 1024) {
-    return `${parseFloat((b / 1024).toFixed(1))} KB`;
-  } else if (b < 1024 * 1024 * 1024) {
-    return `${parseFloat((b / (1024 * 1024)).toFixed(1))} MB`;
+  const KB = 1024;
+  const MB = 1024 * 1024;
+  const GB = 1024 * 1024 * 1024;
+  if (b < MB) {
+    // Under 1 MB → show in KB (no decimals for clean readability)
+    return `${Math.round(b / KB)} KB`;
+  } else if (b < GB) {
+    // 1 MB to 1 GB → show in MB with 2 decimal places
+    return `${(b / MB).toFixed(2)} MB`;
   } else {
-    return `${parseFloat((b / (1024 * 1024 * 1024)).toFixed(2))} GB`;
+    // 1 GB and above → show in GB with 2 decimal places
+    return `${(b / GB).toFixed(2)} GB`;
   }
 }
 

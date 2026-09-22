@@ -2669,7 +2669,9 @@ a {
 .landing-hero-title span {
   background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
+  color: transparent;
 }
 
 .landing-hero-desc {
@@ -2921,6 +2923,48 @@ a {
     padding: 50px 16px;
   }
 }
+
+/* ==========================================================================
+   PAGE SPEED & CORE WEB VITALS (FCP, LCP, CLS, SPEED INDEX) OPTIMIZATIONS
+   ========================================================================== */
+
+/* Defer rendering of off-screen sections until scrolled near viewport */
+#features,
+#pricing,
+#contact,
+.seo-footer {
+  content-visibility: auto;
+  contain-intrinsic-size: 1px 650px;
+}
+
+/* Optimize font-display swap globally — valid @font-face rules with required src property */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 300 800;
+  font-display: swap;
+  src: url('https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuLyfAZ9hiJ-Ek-_EeA.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('https://fonts.gstatic.com/s/jetbrainsmono/v18/tDbY2o-flEEny0FZhsfKu5WU4xD-IQ-PuZJJXxfpAO-Lf1OEBQ.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+
+/* Prevent layout shifts on images and buttons */
+.brand-logo-img,
+.auth-logo-img,
+.upi-qr-image {
+  aspect-ratio: auto;
+  contain: paint;
+}
+
 
 
 
