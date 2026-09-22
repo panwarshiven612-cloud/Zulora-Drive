@@ -270,6 +270,7 @@ function getFileIconMeta(mime, filename = '') {
     other:     { icon: 'fa-regular fa-file',          color: '#94a3b8', label: 'File'     }
   };
   return MAP[cat] || MAP.other;
+}
 
 // ══════════════════════════════════════════════════════════════════════════════
 // REAL-TIME STORAGE USAGE METER (Calculated across active files where isTrashed: false)
