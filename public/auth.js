@@ -526,7 +526,6 @@ export async function signInWithGoogle() {
 }
 
 export const signInWithEmail    = (email, pwd) => signInWithEmailAndPassword(auth, email, pwd);
-export const registerWithEmail  = (email, pwd) => createUserWithEmailAndPassword(auth, email, pwd);
 export const resetPassword      = (email)      => sendPasswordResetEmail(auth, email);
 
 /**
