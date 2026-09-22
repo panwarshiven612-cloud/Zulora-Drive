@@ -78,7 +78,6 @@ export const FIREBASE_CONFIG = {
   appId: "1:715420173020:web:46245edda3eb0f31edaa19"
 };
 
-// ══════════════════════════════════════════════════════════════════════════════
 // GLOBAL APPLICATION STATE
 // ══════════════════════════════════════════════════════════════════════════════
 let allFiles       = [];
@@ -91,6 +90,10 @@ let selectedFile    = null;
 let activePlan      = null;
 let profile         = null;
 let filesUnsubscribe = null;
+let filesSubscriptionGeneration = 0;
+let queuedFileDocs = null;
+let renderFrameId = null;
+let profileRefreshInFlight = false;
 
 // Track active progress bar for current upload
 let currentActiveProgressBar = null;
@@ -267,7 +270,6 @@ function getFileIconMeta(mime, filename = '') {
     other:     { icon: 'fa-regular fa-file',          color: '#94a3b8', label: 'File'     }
   };
   return MAP[cat] || MAP.other;
-}
 
 // ══════════════════════════════════════════════════════════════════════════════
 // REAL-TIME STORAGE USAGE METER (Calculated across active files where isTrashed: false)
@@ -406,6 +408,8 @@ function updateUIProgressBar(percent, customStatus = null) {
 function subscribeUserFiles(currentUser) {
   if (!currentUser?.uid) return;
 
+  const subscriptionGeneration = ++filesSubscriptionGeneration;
+
   if (typeof filesUnsubscribe === 'function') {
     filesUnsubscribe();
     filesUnsubscribe = null;
@@ -416,12 +420,14 @@ function subscribeUserFiles(currentUser) {
       .orderBy("createdAt", "desc")
       .onSnapshot(
         (snapshot) => {
+          if (subscriptionGeneration !== filesSubscriptionGeneration) return;
           renderFileList(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
         },
         (err) => {
           console.warn("[Zulora Files] onSnapshot orderBy error, falling back without orderBy:", err.message);
           filesUnsubscribe = db.collection("users").doc(currentUser.uid).collection("files")
             .onSnapshot((snapshot) => {
+              if (subscriptionGeneration !== filesSubscriptionGeneration) return;
               renderFileList(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
             });
         }
@@ -435,6 +441,16 @@ function subscribeUserFiles(currentUser) {
  * Normalizes and populates file records, applies filters and updates view
  */
 function renderFileList(fileDocs) {
+  queuedFileDocs = fileDocs || [];
+  if (renderFrameId !== null) return;
+  renderFrameId = requestAnimationFrame(() => {
+    renderFrameId = null;
+    renderFileListNow(queuedFileDocs);
+    queuedFileDocs = null;
+  });
+}
+
+function renderFileListNow(fileDocs) {
   allFiles = (fileDocs || []).map((d) => {
     let iso = new Date().toISOString();
     if (d.createdAt?.toDate)                 iso = d.createdAt.toDate().toISOString();
@@ -762,9 +778,15 @@ async function sendWelcomeEmailOnce(user) {
 function initAuthLifecycle() {
   onAuthChange(async (user) => {
     if (!user) {
+      if (renderFrameId !== null) {
+        cancelAnimationFrame(renderFrameId);
+        renderFrameId = null;
+        queuedFileDocs = null;
+      }
       if (typeof filesUnsubscribe === 'function') {
         filesUnsubscribe();
         filesUnsubscribe = null;
+        filesSubscriptionGeneration++;
       }
       setAuthStateUI(false);
       return;
@@ -815,10 +837,15 @@ if (document.readyState === 'complete') {
 
 // Background profile refresh every 45 seconds
 setInterval(async () => {
+  if (profileRefreshInFlight) return;
+  profileRefreshInFlight = true;
   try {
     const refreshed = await refreshProfile();
     if (refreshed) updateStorageUI(refreshed);
-  } catch (_) {}
+  } catch (_) {
+  } finally {
+    profileRefreshInFlight = false;
+  }
 }, 45_000);
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -1027,53 +1054,41 @@ function renderGridView() {
   if (!filesGrid) return;
   filesGrid.innerHTML = '';
 
-  if (currentCategory !== 'all') {
-    const activeCat = CATEGORY_GROUPS.find((c) => c.key === currentCategory) || {
-      key: currentCategory,
-      label: currentCategory.charAt(0).toUpperCase() + currentCategory.slice(1),
-      icon: 'fa-regular fa-folder',
-      color: '#0ea5e9'
-    };
-    const catBytes = filteredFiles.reduce((sum, f) => sum + Number(f.fileSize || f.size || 0), 0);
+  const groups = currentCategory !== 'all'
+    ? [CATEGORY_GROUPS.find((group) => group.key === currentCategory) || {
+        key: currentCategory,
+        label: currentCategory.charAt(0).toUpperCase() + currentCategory.slice(1),
+        icon: 'fa-regular fa-folder',
+        color: '#0ea5e9'
+      }]
+    : CATEGORY_GROUPS;
+
+  const sections = document.createDocumentFragment();
+  groups.forEach((group) => {
+    const groupFiles = filteredFiles.filter((file) =>
+      getFileCategory(file.mimetype || file.type || file.fileType, file.name || file.fileName) === group.key
+    );
+    if (groupFiles.length === 0) return;
+    const groupBytes = groupFiles.reduce((sum, file) => sum + Number(file.fileSize || file.size || 0), 0);
     const section = document.createElement('div');
     section.className = 'file-category-section';
     section.innerHTML = `
       <div class="file-category-header">
         <div class="file-category-title-group">
-          <i class="${activeCat.icon}" style="color:${activeCat.color};"></i>
-          <h3 class="file-category-title">${activeCat.label}</h3>
-          <span class="file-category-count-badge">${filteredFiles.length} file${filteredFiles.length === 1 ? '' : 's'}</span>
+          <i class="${group.icon}" style="color:${group.color};"></i>
+          <h3 class="file-category-title">${group.label}</h3>
+          <span class="file-category-count-badge">${groupFiles.length} file${groupFiles.length === 1 ? '' : 's'}</span>
         </div>
-        <span class="file-category-size">${formatBytes(catBytes)}</span>
+        <span class="file-category-size">${formatBytes(groupBytes)}</span>
       </div>
       <div class="category-file-grid"></div>`;
     const grid = section.querySelector('.category-file-grid');
-    filteredFiles.forEach((file) => grid.appendChild(createFileCardElement(file)));
-    filesGrid.appendChild(section);
-  } else {
-    CATEGORY_GROUPS.forEach((group) => {
-      const groupFiles = filteredFiles.filter((f) =>
-        getFileCategory(f.mimetype || f.type || f.fileType, f.name || f.fileName) === group.key
-      );
-      if (groupFiles.length === 0) return;
-      const groupBytes = groupFiles.reduce((sum, f) => sum + Number(f.fileSize || f.size || 0), 0);
-      const section = document.createElement('div');
-      section.className = 'file-category-section';
-      section.innerHTML = `
-        <div class="file-category-header">
-          <div class="file-category-title-group">
-            <i class="${group.icon}" style="color:${group.color};"></i>
-            <h3 class="file-category-title">${group.label}</h3>
-            <span class="file-category-count-badge">${groupFiles.length} file${groupFiles.length === 1 ? '' : 's'}</span>
-          </div>
-          <span class="file-category-size">${formatBytes(groupBytes)}</span>
-        </div>
-        <div class="category-file-grid"></div>`;
-      const grid = section.querySelector('.category-file-grid');
-      groupFiles.forEach((file) => grid.appendChild(createFileCardElement(file)));
-      filesGrid.appendChild(section);
-    });
-  }
+    const fileCards = document.createDocumentFragment();
+    groupFiles.forEach((file) => fileCards.appendChild(createFileCardElement(file)));
+    grid.appendChild(fileCards);
+    sections.appendChild(section);
+  });
+  filesGrid.appendChild(sections);
 }
 
 // ── List View (Categorised Sections Table) ────────────────────────────────────
@@ -1081,53 +1096,38 @@ function renderListView() {
   if (!filesTableBody) return;
   filesTableBody.innerHTML = '';
 
-  if (currentCategory !== 'all') {
-    const activeCat = CATEGORY_GROUPS.find((c) => c.key === currentCategory) || {
-      key: currentCategory,
-      label: currentCategory.charAt(0).toUpperCase() + currentCategory.slice(1),
-      icon: 'fa-regular fa-folder',
-      color: '#0ea5e9'
-    };
-    const catBytes = filteredFiles.reduce((sum, f) => sum + Number(f.fileSize || f.size || 0), 0);
+  const groups = currentCategory !== 'all'
+    ? [CATEGORY_GROUPS.find((group) => group.key === currentCategory) || {
+        key: currentCategory,
+        label: currentCategory.charAt(0).toUpperCase() + currentCategory.slice(1),
+        icon: 'fa-regular fa-folder',
+        color: '#0ea5e9'
+      }]
+    : CATEGORY_GROUPS;
+  const rows = document.createDocumentFragment();
+  groups.forEach((group) => {
+    const groupFiles = filteredFiles.filter((file) =>
+      getFileCategory(file.mimetype || file.type || file.fileType, file.name || file.fileName) === group.key
+    );
+    if (groupFiles.length === 0) return;
+    const groupBytes = groupFiles.reduce((sum, file) => sum + Number(file.fileSize || file.size || 0), 0);
     const headerRow = document.createElement('tr');
     headerRow.className = 'category-header-row';
     headerRow.innerHTML = `
       <td colspan="4">
         <div class="category-header-content">
           <div class="category-header-left">
-            <i class="${activeCat.icon}" style="color:${activeCat.color};"></i>
-            <span>${activeCat.label}</span>
-            <span class="file-category-count-badge">${filteredFiles.length}</span>
+            <i class="${group.icon}" style="color:${group.color};"></i>
+            <span>${group.label}</span>
+            <span class="file-category-count-badge">${groupFiles.length}</span>
           </div>
-          <div class="file-category-size">${formatBytes(catBytes)}</div>
+          <div class="file-category-size">${formatBytes(groupBytes)}</div>
         </div>
       </td>`;
-    filesTableBody.appendChild(headerRow);
-    filteredFiles.forEach((file) => filesTableBody.appendChild(createFileListRowElement(file)));
-  } else {
-    CATEGORY_GROUPS.forEach((group) => {
-      const groupFiles = filteredFiles.filter((f) =>
-        getFileCategory(f.mimetype || f.type || f.fileType, f.name || f.fileName) === group.key
-      );
-      if (groupFiles.length === 0) return;
-      const groupBytes = groupFiles.reduce((sum, f) => sum + Number(f.fileSize || f.size || 0), 0);
-      const headerRow = document.createElement('tr');
-      headerRow.className = 'category-header-row';
-      headerRow.innerHTML = `
-        <td colspan="4">
-          <div class="category-header-content">
-            <div class="category-header-left">
-              <i class="${group.icon}" style="color:${group.color};"></i>
-              <span>${group.label}</span>
-              <span class="file-category-count-badge">${groupFiles.length}</span>
-            </div>
-            <div class="file-category-size">${formatBytes(groupBytes)}</div>
-          </div>
-        </td>`;
-      filesTableBody.appendChild(headerRow);
-      groupFiles.forEach((file) => filesTableBody.appendChild(createFileListRowElement(file)));
-    });
-  }
+    rows.appendChild(headerRow);
+    groupFiles.forEach((file) => rows.appendChild(createFileListRowElement(file)));
+  });
+  filesTableBody.appendChild(rows);
 }
 
 // ── HTML escape helper ────────────────────────────────────────────────────────
@@ -1143,8 +1143,6 @@ function sanitizeUrl(value) {
     return '';
   }
 }
-  const fUrl  = sanitizeUrl(file.fileUrl || file.url || '');
-  ? `<img src="${escHtml(fUrl)}" alt="${escHtml(fName)}" class="file-card-thumb" loading="lazy">`
 
 // ══════════════════════════════════════════════════════════════════════════════
 // FILE ACTIONS
@@ -1958,9 +1956,15 @@ userAvatarBtn?.addEventListener('click', (e) => {
 // Sign Out
 logoutBtn?.addEventListener('click', async () => {
   try {
+    if (renderFrameId !== null) {
+      cancelAnimationFrame(renderFrameId);
+      renderFrameId = null;
+      queuedFileDocs = null;
+    }
     if (typeof filesUnsubscribe === 'function') {
       filesUnsubscribe();
       filesUnsubscribe = null;
+      filesSubscriptionGeneration++;
     }
     await logOut();
     setAuthStateUI(false);
