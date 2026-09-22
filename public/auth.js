@@ -26,6 +26,7 @@ import {
   signOut,
   onAuthStateChanged,
   sendPasswordResetEmail,
+  sendEmailVerification,
   storageRef,
   uploadBytesResumable,
   getDownloadURL,
@@ -52,7 +53,75 @@ export const DEFAULT_STORAGE_BYTES   = 10 * 1024 * 1024 * 1024; // 10 GB Free St
 export const MAX_STARTER_FILE_BYTES  = 500 * 1024 * 1024;        // 500 MB max per file (Starter)
 export const REFERRAL_BONUS_BYTES    = 5 * 1024 * 1024 * 1024;   // +5 GB per referral
 
-// ── Cloudinary Configuration ──────────────────────────────────────────────────
+// ── Disposable / Temp-Mail Domain Blacklist ───────────────────────────────────
+/**
+ * Comprehensive blacklist of known disposable, temporary, and throwaway email
+ * providers. Updated list of 60+ domains covering the most common abuse vectors.
+ * Client-side check only — server-side Firestore rules enforce email_verified.
+ */
+export const DISPOSABLE_EMAIL_DOMAINS = new Set([
+  // Classic temp-mail giants
+  'tempmail.com', 'temp-mail.org', 'temp-mail.io', 'tempmail.net', 'tempinbox.com',
+  'mailinator.com', 'mailinator.net', 'maildrop.cc', 'mailnull.com', 'mailnesia.com',
+  '10minutemail.com', '10minutemail.net', '10minutemail.org', '10minemail.com',
+  'guerrillamail.com', 'guerrillamail.net', 'guerrillamail.org', 'guerrillamail.de',
+  'guerrillamail.biz', 'guerrillamail.info', 'guerrillamailblock.com',
+  'throwam.com', 'throwamailaway.net', 'throwawaymail.com', 'throwam.net',
+  'yopmail.com', 'yopmail.fr', 'cool.fr.nf', 'jetable.fr.nf', 'nospam.ze.tc',
+  'nomail.xl.cx', 'mega.zik.dj', 'speed.1s.fr', 'courriel.fr.nf', 'moncourrier.fr.nf',
+  'dispostable.com', 'discard.email', 'discardmail.com', 'discardmail.de',
+  'spamgourmet.com', 'spamgourmet.net', 'spamgourmet.org',
+  'trashmail.com', 'trashmail.me', 'trashmail.at', 'trashmail.io', 'trashmail.net',
+  'trashmail.org', 'trashmailer.com', 'trashmail.xyz',
+  'sharklasers.com', 'guerrillamailblock.com', 'grr.la', 'guerrillamail.info',
+  'spam4.me', 'spamfree24.org', 'spamfree.eu',
+  'fakeinbox.com', 'fakemail.fr', 'fakemail.net',
+  'mailnull.com', 'mailtemp.info', 'mailtemp.net',
+  'getnada.com', 'getairmail.com', 'getonemail.com',
+  'mohmal.com', 'mailpoof.com', 'mailsac.com',
+  'spamevader.net', 'spaml.de', 'spamthisplease.com',
+  'emailondeck.com', 'emailfake.com',
+  'crap.handcrafted.jp', 'filzmail.com', 'fleckens.hu',
+  'zetmail.com', 'zzrgg.com', 'binkmail.com',
+  'haltospam.com', 'ieatspam.eu', 'ieatspam.info',
+  'jetable.com', 'jetable.net', 'jetable.org', 'jetable.pp.ua',
+  'kurzepost.de', 'lifebyfood.com', 'link2mail.net',
+  'mt2009.com', 'mt2014.com', 'mytempemail.com', 'mytrashmail.com',
+  'noclickemail.com', 'nofaux.com', 'nwytg.net',
+  'objectmail.com', 'odnorazovoe.ru',
+  'pookmail.com', 'rootfest.net', 'rppkn.com',
+  's0ny.net', 'safe-mail.net', 'saynotospams.com',
+  'teleworm.us', 'tempalias.com', 'tempe-mail.com', 'tempemail.biz',
+  'tempemail.co.za', 'tempthe.net', 'thankyou2010.com',
+  'thelimousine.com', 'thisisnotmyrealemail.com', 'thisurl.website',
+  'throwam.com', 'tmail.com', 'tmail.io', 'tmpeml.com',
+  'vpn.st', 'webemail.me', 'wegwerfmail.de', 'wegwerfmail.net',
+  'wegwerfmail.org', 'wetrainbayarea.org', 'wh4f.org',
+  'xagloo.com', 'xemaps.com', 'xents.com', 'xmaily.com', 'xoxy.net',
+  'yapped.net', 'yep.it', 'yomail.info', 'yuurok.com',
+  'z1p.biz', 'zhorachu.com', 'zippymail.info', 'zoemail.net',
+  'zomg.info', 'zxcv.com'
+]);
+
+/**
+ * Returns true if the email domain belongs to a known disposable/temp provider.
+ * Case-insensitive. Used as a client-side gate before Firebase registration.
+ * @param {string} email
+ * @returns {boolean}
+ */
+export function isDisposableEmail(email) {
+  if (!email || typeof email !== 'string') return false;
+  const parts  = email.toLowerCase().trim().split('@');
+  if (parts.length !== 2 || !parts[1]) return false;
+  const domain = parts[1];
+  // Exact domain match
+  if (DISPOSABLE_EMAIL_DOMAINS.has(domain)) return true;
+  // Subdomain match (e.g. user@mail.mailinator.com)
+  const tld2 = domain.split('.').slice(-2).join('.');
+  return DISPOSABLE_EMAIL_DOMAINS.has(tld2);
+}
+
+
 export const CLOUDINARY_CLOUD_NAME    = 't3dkhv0z';
 export const CLOUDINARY_UPLOAD_PRESET = 'zulora_preset';
 export const CLOUDINARY_API_ENDPOINT  = 'https://api.cloudinary.com/v1_1/t3dkhv0z/auto/upload';
@@ -456,8 +525,105 @@ export async function signInWithGoogle() {
 }
 
 export const signInWithEmail    = (email, pwd) => signInWithEmailAndPassword(auth, email, pwd);
-export const registerWithEmail  = (email, pwd) => createUserWithEmailAndPassword(auth, email, pwd);
 export const resetPassword      = (email)      => sendPasswordResetEmail(auth, email);
+
+/**
+ * Secure email registration flow:
+ *   1. Blocks known disposable / temp-mail domains before any Firebase call.
+ *   2. Creates the Firebase account.
+ *   3. Immediately sends a verification link to the user's inbox.
+ *   4. Signs the user back out so they cannot access the dashboard unverified.
+ *
+ * @param {string} email
+ * @param {string} password
+ * @returns {Promise<{ verificationSent: true }>}
+ * @throws {Error} with code 'DISPOSABLE_EMAIL' if a temp-mail domain is detected
+ */
+export async function registerWithEmailSecure(email, password) {
+  // ── Gate 1: Client-side disposable email check ─────────────────────────────
+  if (isDisposableEmail(email)) {
+    const err = new Error(
+      'Temporary or disposable email addresses are strictly prohibited. ' +
+      'Please use a valid personal email or sign in with Google.'
+    );
+    err.code = 'DISPOSABLE_EMAIL';
+    throw err;
+  }
+
+  // ── Gate 2: Create Firebase account ────────────────────────────────────────
+  const credential = await createUserWithEmailAndPassword(auth, email, password);
+  const user       = credential.user;
+
+  // ── Gate 3: Fire verification email ────────────────────────────────────────
+  try {
+    await sendEmailVerification(user, {
+      // After clicking the link, send users directly to the app
+      url: 'https://drive.zulora.in/login.html?verified=1'
+    });
+  } catch (verifyErr) {
+    console.warn('[Zulora] sendEmailVerification notice:', verifyErr.message);
+    // Non-fatal — account still created, let the caller handle UI
+  }
+
+  // ── Gate 4: Sign out immediately — deny dashboard access until verified ─────
+  try {
+    await signOut(auth);
+  } catch (signOutErr) {
+    console.warn('[Zulora] Post-registration signOut notice:', signOutErr.message);
+  }
+
+  return { verificationSent: true, email };
+}
+
+// Backward-compatible alias — replaces the old one-liner
+export const registerWithEmail = registerWithEmailSecure;
+
+/**
+ * Re-sends the Firebase email verification link to an already-registered but
+ * unverified user. Signs in temporarily, checks status, fires the email, then
+ * signs out again.
+ *
+ * @param {string} email
+ * @param {string} password
+ * @returns {Promise<{ sent: boolean, alreadyVerified: boolean }>}
+ */
+export async function resendVerificationEmail(email, password) {
+  let credential = null;
+  try {
+    credential = await signInWithEmailAndPassword(auth, email, password);
+  } catch (signInErr) {
+    const friendlyMsg = AUTH_ERROR_MAP[signInErr?.code] || signInErr.message;
+    throw new Error(friendlyMsg);
+  }
+
+  const user = credential.user;
+
+  // Reload to get the freshest token (in case they already clicked the link)
+  await user.reload();
+  const refreshedUser = auth.currentUser;
+
+  if (refreshedUser?.emailVerified) {
+    await signOut(auth);
+    return { sent: false, alreadyVerified: true };
+  }
+
+  // Re-send the verification email
+  try {
+    await sendEmailVerification(refreshedUser, {
+      url: 'https://drive.zulora.in/login.html?verified=1'
+    });
+  } catch (err) {
+    console.warn('[Zulora] resendVerificationEmail notice:', err.message);
+    throw new Error('Failed to resend verification email. Please try again shortly.');
+  }
+
+  // Sign out again — keep them locked out until they verify
+  await signOut(auth).catch(() => {});
+
+  return { sent: true, alreadyVerified: false };
+}
+
+
 
 export async function logOut() {
   currentUser             = null;

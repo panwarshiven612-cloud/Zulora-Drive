@@ -39,3 +39,4 @@ for label, token in js_checks:
     status = 'OK  ' if token in js else 'MISS'
     print(f'  [{status}] JS:  {label}')
 print('\nAll checks done.')
+

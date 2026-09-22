@@ -43,3 +43,4 @@ else:
 with open('public/index.html', 'w', encoding='utf-8') as f:
     f.write(content)
 print('index.html accessibility and landmark patches applied')
+

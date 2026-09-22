@@ -31,7 +31,7 @@
 </head>
 <body class="auth-page">
   <div class="auth-wrapper">
-    <div class="auth-card">
+    <div class="auth-card" id="authCard">
       <!-- BRAND HEADER -->
       <div class="auth-brand">
         <div class="auth-logo-wrapper">
@@ -104,35 +104,59 @@
       signInWithGoogle,
       signInWithEmail,
       registerWithEmail,
+      resendVerificationEmail,
       resetPassword,
       onAuthChange,
-      friendlyAuthError
+      friendlyAuthError,
+      isDisposableEmail
     } from './auth.js';
+
+    import { auth } from './firebase-config.js';
 
     let isSignUp = false;
 
-    // Redirect logged in users directly to index.html
+    // ── Track pending-verification state ──────────────────────────────────────
+    let pendingEmail    = null;
+    let pendingPassword = null; // Held in memory only — never persisted
+
+    // ── Redirect on auth state change (verified users only) ───────────────────
     onAuthChange((user) => {
-      if (user) {
+      // Google users are always verified; email users must pass emailVerified check
+      if (user && user.emailVerified) {
         window.location.replace('index.html');
+      }
+      // If signed in but unverified, sign them out silently to keep the page clean
+      // (the pending screen already handles their state)
+      if (user && !user.emailVerified) {
+        import('./firebase-config.js').then(({ signOut, auth }) => signOut(auth).catch(() => {}));
       }
     });
 
-    const tabSignIn = document.getElementById('tabSignIn');
-    const tabSignUp = document.getElementById('tabSignUp');
-    const nameGroup = document.getElementById('nameGroup');
-    const authForm = document.getElementById('authForm');
-    const authSubmitBtn = document.getElementById('authSubmitBtn');
-    const authAlert = document.getElementById('authAlert');
-    const googleSignInBtn = document.getElementById('googleSignInBtn');
+    // ── Handle ?verified=1 redirect from the verification email link ──────────
+    if (new URLSearchParams(window.location.search).get('verified') === '1') {
+      showAlert(
+        '✅ Email verified! Please sign in with your credentials below.',
+        'success'
+      );
+    }
+
+    const tabSignIn         = document.getElementById('tabSignIn');
+    const tabSignUp         = document.getElementById('tabSignUp');
+    const nameGroup         = document.getElementById('nameGroup');
+    const authForm          = document.getElementById('authForm');
+    const authSubmitBtn     = document.getElementById('authSubmitBtn');
+    const authAlert         = document.getElementById('authAlert');
+    const googleSignInBtn   = document.getElementById('googleSignInBtn');
     const forgotPasswordBtn = document.getElementById('forgotPasswordBtn');
-    const forgotRow = document.getElementById('forgotRow');
+    const forgotRow         = document.getElementById('forgotRow');
     const toggleAuthModeBtn = document.getElementById('toggleAuthModeBtn');
-    const authFooterText = document.getElementById('authFooterText');
+    const authFooterText    = document.getElementById('authFooterText');
+    const authCard          = document.getElementById('authCard');
 
     function setAuthMode(signUp) {
       isSignUp = signUp;
       authAlert.style.display = 'none';
+      hideVerifyPendingScreen();
 
       if (isSignUp) {
         tabSignUp.classList.add('active');
@@ -162,31 +186,166 @@
 
     function showAlert(message, type = 'danger') {
       authAlert.className = `auth-alert ${type}`;
-      authAlert.textContent = message;
+      authAlert.innerHTML = message;
       authAlert.style.display = 'block';
     }
 
-    // Google Auth
+    // ── Verification Pending Screen ───────────────────────────────────────────
+    function showVerifyPendingScreen(email) {
+      const existing = document.getElementById('verifyPendingScreen');
+      if (existing) existing.remove();
+
+      const screen = document.createElement('div');
+      screen.id = 'verifyPendingScreen';
+      screen.className = 'verify-pending-screen';
+      screen.innerHTML = `
+        <div class="verify-pending-icon">
+          <i class="fa-solid fa-envelope-circle-check"></i>
+        </div>
+        <h2 class="verify-pending-title">Verify Your Email</h2>
+        <p class="verify-pending-body">
+          We've sent a verification link to<br>
+          <strong class="verify-pending-email">${escHtml(email)}</strong><br>
+          Check your inbox (and spam folder) then click the link to activate your Zulora Drive account.
+        </p>
+        <div class="verify-pending-steps">
+          <div class="verify-step">
+            <span class="verify-step-num">1</span>
+            <span>Open Gmail / your inbox</span>
+          </div>
+          <div class="verify-step">
+            <span class="verify-step-num">2</span>
+            <span>Find the email from Zulora Drive</span>
+          </div>
+          <div class="verify-step">
+            <span class="verify-step-num">3</span>
+            <span>Click "Verify your email" in the email</span>
+          </div>
+        </div>
+        <div class="verify-pending-actions">
+          <button id="resendVerifyBtn" class="btn btn-azure-gradient btn-full">
+            <i class="fa-solid fa-paper-plane"></i>
+            <span>Resend Verification Email</span>
+          </button>
+          <button id="backToSignInBtn" class="btn btn-secondary btn-full" style="margin-top:0.5rem;">
+            <i class="fa-solid fa-arrow-left"></i>
+            <span>Back to Sign In</span>
+          </button>
+        </div>
+        <p id="verifyPendingStatus" class="verify-pending-status" style="display:none;"></p>
+      `;
+
+      // Hide the regular auth form content
+      authForm.style.display = 'none';
+      if (googleSignInBtn) googleSignInBtn.style.display = 'none';
+      document.querySelector('.auth-divider')?.style.setProperty('display', 'none');
+      document.querySelector('.auth-tabs')?.style.setProperty('display', 'none');
+      document.querySelector('.auth-footer')?.style.setProperty('display', 'none');
+      authAlert.style.display = 'none';
+
+      authCard.appendChild(screen);
+
+      // ── Resend Button ──────────────────────────────────────────────────────
+      document.getElementById('resendVerifyBtn').addEventListener('click', async () => {
+        const resendBtn   = document.getElementById('resendVerifyBtn');
+        const statusEl    = document.getElementById('verifyPendingStatus');
+
+        if (!pendingPassword) {
+          statusEl.className = 'verify-pending-status error';
+          statusEl.textContent = 'Session expired. Please sign up again to resend.';
+          statusEl.style.display = 'block';
+          return;
+        }
+
+        resendBtn.disabled = true;
+        resendBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Sending...';
+        statusEl.style.display = 'none';
+
+        try {
+          const result = await resendVerificationEmail(email, pendingPassword);
+          if (result.alreadyVerified) {
+            statusEl.className = 'verify-pending-status success';
+            statusEl.textContent = '✅ Your email is already verified! Please sign in.';
+            statusEl.style.display = 'block';
+            setTimeout(() => setAuthMode(false), 2500);
+          } else {
+            statusEl.className = 'verify-pending-status success';
+            statusEl.textContent = '✅ Verification email resent! Please check your inbox.';
+            statusEl.style.display = 'block';
+          }
+        } catch (err) {
+          statusEl.className = 'verify-pending-status error';
+          statusEl.textContent = '⚠️ ' + (err.message || 'Failed to resend. Please try again.');
+          statusEl.style.display = 'block';
+        } finally {
+          resendBtn.disabled = false;
+          resendBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> <span>Resend Verification Email</span>';
+          // Rate-limit button — 30 second cooldown
+          resendBtn.disabled = true;
+          let cooldown = 30;
+          const interval = setInterval(() => {
+            cooldown--;
+            resendBtn.innerHTML = `<i class="fa-solid fa-clock"></i> <span>Resend available in ${cooldown}s</span>`;
+            if (cooldown <= 0) {
+              clearInterval(interval);
+              resendBtn.disabled = false;
+              resendBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> <span>Resend Verification Email</span>';
+            }
+          }, 1000);
+        }
+      });
+
+      // ── Back to Sign In ────────────────────────────────────────────────────
+      document.getElementById('backToSignInBtn').addEventListener('click', () => {
+        pendingEmail    = null;
+        pendingPassword = null;
+        setAuthMode(false);
+      });
+    }
+
+    function hideVerifyPendingScreen() {
+      const screen = document.getElementById('verifyPendingScreen');
+      if (screen) screen.remove();
+      authForm.style.display = '';
+      if (googleSignInBtn) googleSignInBtn.style.display = '';
+      document.querySelector('.auth-divider')?.style.removeProperty('display');
+      document.querySelector('.auth-tabs')?.style.removeProperty('display');
+      document.querySelector('.auth-footer')?.style.removeProperty('display');
+    }
+
+    function escHtml(str) {
+      return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    // ── Google Auth ───────────────────────────────────────────────────────────
     googleSignInBtn.addEventListener('click', async () => {
       authAlert.style.display = 'none';
       try {
         await signInWithGoogle();
-        // Redirect handled by onAuthChange
+        // Redirect handled by onAuthChange (Google users are always verified)
       } catch (err) {
         showAlert(friendlyAuthError(err));
       }
     });
 
-    // Form Submit (Email / Password)
+    // ── Form Submit (Email / Password) ────────────────────────────────────────
     authForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       authAlert.style.display = 'none';
 
-      const email = document.getElementById('authEmail').value.trim();
+      const email    = document.getElementById('authEmail').value.trim();
       const password = document.getElementById('authPassword').value;
 
       if (!email || !password) {
         return showAlert('Please fill out all required fields.');
+      }
+
+      // ── Client-side disposable email gate (Sign-Up only) ──────────────────
+      if (isSignUp && isDisposableEmail(email)) {
+        return showAlert(
+          '🚫 <strong>Temporary or disposable email addresses are strictly prohibited.</strong> ' +
+          'Please use a valid personal or work email, or sign in with Google.'
+        );
       }
 
       authSubmitBtn.disabled = true;
@@ -194,20 +353,36 @@
 
       try {
         if (isSignUp) {
-          await registerWithEmail(email, password);
+          // Secure registration — returns { verificationSent: true, email }
+          const result = await registerWithEmail(email, password);
+          if (result && result.verificationSent) {
+            // Hold password in session memory for resend functionality
+            pendingEmail    = email;
+            pendingPassword = password;
+            showVerifyPendingScreen(email);
+          }
         } else {
           await signInWithEmail(email, password);
+          // Redirect handled by onAuthChange for verified users
         }
       } catch (err) {
-        showAlert(friendlyAuthError(err));
+        // Show specific message for disposable email errors
+        if (err.code === 'DISPOSABLE_EMAIL') {
+          showAlert(
+            '🚫 <strong>Temporary or disposable email addresses are strictly prohibited.</strong> ' +
+            'Please use a valid personal or work email, or sign in with Google.'
+          );
+        } else {
+          showAlert(friendlyAuthError(err));
+        }
         authSubmitBtn.disabled = false;
-        authSubmitBtn.querySelector('span')
-          ? (authSubmitBtn.querySelector('span').textContent = isSignUp ? 'Create Account' : 'Sign In')
-          : (authSubmitBtn.textContent = isSignUp ? 'Create Account' : 'Sign In');
+        const spanEl = authSubmitBtn.querySelector('span');
+        if (spanEl) spanEl.textContent = isSignUp ? 'Create Account' : 'Sign In';
+        else authSubmitBtn.textContent = isSignUp ? 'Create Account' : 'Sign In';
       }
     });
 
-    // Password Reset
+    // ── Password Reset ────────────────────────────────────────────────────────
     forgotPasswordBtn.addEventListener('click', async (e) => {
       e.preventDefault();
       authAlert.style.display = 'none';
@@ -219,7 +394,7 @@
 
       try {
         await resetPassword(email);
-        showAlert(`Password reset email sent to ${email}. Please check your inbox.`, 'success');
+        showAlert(`Password reset email sent to ${escHtml(email)}. Please check your inbox.`, 'success');
       } catch (err) {
         showAlert(friendlyAuthError(err));
       }

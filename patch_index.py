@@ -70,3 +70,4 @@ content = content.replace(
 with open('public/index.html', 'w', encoding='utf-8') as f:
     f.write(content)
 print('index.html SEO/meta patches applied successfully')
+

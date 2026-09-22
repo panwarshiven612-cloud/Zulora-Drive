@@ -621,6 +621,128 @@ export function setAuthStateUI(isAuthenticated) {
   }
 }
 
+// ── Email Verification Helper ─────────────────────────────────────────────────
+/**
+ * Injects a persistent unverified-account banner in the dashboard.
+ * Blocks storage, upload, and file ops until the user verifies their email.
+ * @param {import('firebase/auth').User} user
+ */
+function showUnverifiedBanner(user) {
+  // Ensure the app shell is visible so the banner renders inside it
+  setAuthStateUI(true);
+
+  // Hide interactive areas — upload, file grid, storage bar
+  const mainWS = $('mainWorkspace');
+  const sidebar = $('appSidebar');
+  if (mainWS)  mainWS.style.display  = 'none';
+
+  // Show the dedicated verify banner
+  let banner = $('emailVerifyBanner');
+  if (!banner) {
+    // Fallback: create it if the HTML placeholder isn't present
+    banner = document.createElement('div');
+    banner.id = 'emailVerifyBanner';
+    const appContainer = $('appContainer');
+    if (appContainer) appContainer.prepend(banner);
+  }
+
+  banner.className = 'email-verify-banner';
+  banner.style.display = 'flex';
+  banner.innerHTML = `
+    <div class="evb-icon">
+      <i class="fa-solid fa-envelope-open-text"></i>
+    </div>
+    <div class="evb-content">
+      <p class="evb-title">Email Verification Required</p>
+      <p class="evb-body">
+        We sent a verification link to <strong>${escHtml(user.email || '')}</strong>.
+        Please check your inbox and click the link to unlock your Zulora Drive storage.
+      </p>
+    </div>
+    <div class="evb-actions">
+      <button id="evbResendBtn" class="btn btn-azure-gradient evb-btn">
+        <i class="fa-solid fa-paper-plane"></i> Resend Email
+      </button>
+      <button id="evbCheckBtn" class="btn btn-secondary evb-btn">
+        <i class="fa-solid fa-rotate"></i> Check Status
+      </button>
+    </div>
+  `;
+
+  // ── Resend from dashboard banner ──────────────────────────────────────────
+  banner.querySelector('#evbResendBtn')?.addEventListener('click', async () => {
+    const resendBtn = $('evbResendBtn');
+    if (resendBtn) {
+      resendBtn.disabled = true;
+      resendBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Sending...';
+    }
+    try {
+      // Import sendEmailVerification on-demand to avoid circular dep issues
+      const { sendEmailVerification } = await import('./firebase-config.js');
+      await sendEmailVerification(user, {
+        url: 'https://drive.zulora.in/login.html?verified=1'
+      });
+      showToast('Verification email sent! Check your inbox.', false);
+    } catch (err) {
+      showToast('Could not resend email. Try again shortly.', true);
+      console.warn('[Zulora] Dashboard resend notice:', err.message);
+    } finally {
+      if (resendBtn) {
+        // 60-second cooldown on the dashboard resend button
+        let cd = 60;
+        const iv = setInterval(() => {
+          cd--;
+          if (resendBtn) resendBtn.innerHTML = `<i class="fa-solid fa-clock"></i> Resend (${cd}s)`;
+          if (cd <= 0) {
+            clearInterval(iv);
+            if (resendBtn) {
+              resendBtn.disabled  = false;
+              resendBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Resend Email';
+            }
+          }
+        }, 1000);
+      }
+    }
+  });
+
+  // ── Check verification status ─────────────────────────────────────────────
+  banner.querySelector('#evbCheckBtn')?.addEventListener('click', async () => {
+    const checkBtn = $('evbCheckBtn');
+    if (checkBtn) {
+      checkBtn.disabled = true;
+      checkBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Checking...';
+    }
+    try {
+      await user.reload();
+      const fresh = auth.currentUser;
+      if (fresh && fresh.emailVerified) {
+        showToast('✅ Email verified! Loading your drive...', false);
+        // Reload the page to re-trigger the full auth lifecycle
+        setTimeout(() => window.location.reload(), 1200);
+      } else {
+        showToast('Email not yet verified. Please click the link in your inbox.', true);
+        if (checkBtn) {
+          checkBtn.disabled  = false;
+          checkBtn.innerHTML = '<i class="fa-solid fa-rotate"></i> Check Status';
+        }
+      }
+    } catch (err) {
+      showToast('Status check failed. Please try again.', true);
+      if (checkBtn) {
+        checkBtn.disabled  = false;
+        checkBtn.innerHTML = '<i class="fa-solid fa-rotate"></i> Check Status';
+      }
+    }
+  });
+}
+
+function hideUnverifiedBanner() {
+  const banner = $('emailVerifyBanner');
+  if (banner) banner.style.display = 'none';
+  const mainWS = $('mainWorkspace');
+  if (mainWS) mainWS.style.display = '';
+}
+
 function initAuthLifecycle() {
   onAuthChange(async (user) => {
     if (!user) {
@@ -632,12 +754,23 @@ function initAuthLifecycle() {
       return;
     }
 
+    // ── Email Verification Gate ───────────────────────────────────────────────
+    // Google accounts always have emailVerified: true — they bypass this gate.
+    // Email/Password accounts that haven't clicked the verification link are
+    // shown a persistent banner and denied access to storage and file ops.
+    if (!user.emailVerified) {
+      showUnverifiedBanner(user);
+      return; // Do NOT proceed to dashboard setup, file subscription, or bootstrapUser
+    }
+
+    // ── Verified user — full dashboard access ─────────────────────────────────
+    hideUnverifiedBanner();
     setAuthStateUI(true);
 
     // Immediate UI placeholder until Firestore loads
     setupUserUI(user, {
       email:       user.email,
-      displayName: user.displayName || user.email.split('@')[0],
+      displayName: user.displayName || (user.email ? user.email.split('@')[0] : 'User'),
       username:    deriveUsername(user),
       accountId:   deriveAccountId(user)
     });
@@ -654,6 +787,7 @@ function initAuthLifecycle() {
     subscribeUserFiles(user);
   });
 }
+
 
 if (document.readyState === 'complete') {
   initAuthLifecycle();

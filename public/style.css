@@ -2966,5 +2966,223 @@ a {
 }
 
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   EMAIL VERIFICATION BANNER  — Dashboard unverified-account warning
+   Displayed in #appContainer when user.emailVerified === false
+   ═══════════════════════════════════════════════════════════════════════════ */
+.email-verify-banner {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  width: 100%;
+  padding: 0.9rem 1.5rem;
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border-bottom: 2px solid #f59e0b;
+  position: sticky;
+  top: 0;
+  z-index: 200;
+  box-sizing: border-box;
+  flex-wrap: wrap;
+}
 
+.evb-icon {
+  flex-shrink: 0;
+  width: 2.5rem;
+  height: 2.5rem;
+  background: #f59e0b;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 1.1rem;
+}
+
+.evb-content {
+  flex: 1;
+  min-width: 200px;
+}
+
+.evb-title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #92400e;
+  margin: 0 0 0.2rem;
+}
+
+.evb-body {
+  font-size: 0.82rem;
+  color: #78350f;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.evb-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.evb-btn {
+  font-size: 0.8rem;
+  padding: 0.45rem 0.9rem;
+  white-space: nowrap;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: opacity 0.2s, transform 0.15s;
+}
+
+.evb-btn:hover:not(:disabled) {
+  opacity: 0.88;
+  transform: translateY(-1px);
+}
+
+.evb-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+@media (max-width: 600px) {
+  .email-verify-banner {
+    padding: 0.75rem 1rem;
+    gap: 0.75rem;
+  }
+  .evb-actions {
+    width: 100%;
+  }
+  .evb-btn {
+    flex: 1;
+    text-align: center;
+    justify-content: center;
+  }
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   VERIFY PENDING SCREEN  — login.html post-registration state
+   Shown inside .auth-card after sendEmailVerification fires
+   ═══════════════════════════════════════════════════════════════════════════ */
+.verify-pending-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.25rem;
+  padding: 0.5rem 0 1rem;
+  text-align: center;
+  animation: fadeInUp 0.45s ease both;
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+
+.verify-pending-icon {
+  width: 5rem;
+  height: 5rem;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #0ea5e9, #38bdf8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.2rem;
+  color: #fff;
+  box-shadow: 0 8px 24px rgba(14, 165, 233, 0.38);
+  animation: iconPulse 2.5s ease-in-out infinite;
+}
+
+@keyframes iconPulse {
+  0%, 100% { box-shadow: 0 8px 24px rgba(14, 165, 233, 0.38); }
+  50%       { box-shadow: 0 8px 36px rgba(14, 165, 233, 0.65); }
+}
+
+.verify-pending-title {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--text-primary, #f1f5f9);
+  margin: 0;
+}
+
+.verify-pending-body {
+  font-size: 0.9rem;
+  color: var(--text-muted, #94a3b8);
+  line-height: 1.6;
+  margin: 0;
+  max-width: 340px;
+}
+
+.verify-pending-email {
+  color: var(--azure-primary, #0ea5e9);
+  word-break: break-all;
+}
+
+/* Step-by-step instructions */
+.verify-pending-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 100%;
+  max-width: 320px;
+  text-align: left;
+  background: rgba(14, 165, 233, 0.07);
+  border: 1px solid rgba(14, 165, 233, 0.2);
+  border-radius: 12px;
+  padding: 0.9rem 1rem;
+}
+
+.verify-step {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  font-size: 0.83rem;
+  color: var(--text-secondary, #cbd5e1);
+}
+
+.verify-step-num {
+  flex-shrink: 0;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #0ea5e9, #38bdf8);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.verify-pending-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 100%;
+  max-width: 320px;
+}
+
+/* Status feedback line below action buttons */
+.verify-pending-status {
+  font-size: 0.82rem;
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  width: 100%;
+  max-width: 320px;
+  text-align: center;
+  animation: fadeInUp 0.3s ease both;
+}
+
+.verify-pending-status.success {
+  color: #065f46;
+  background: #d1fae5;
+  border: 1px solid #6ee7b7;
+}
+
+.verify-pending-status.error {
+  color: #7f1d1d;
+  background: #fee2e2;
+  border: 1px solid #fca5a5;
+}
 
