@@ -105,6 +105,7 @@ let currentActiveProgressStatus = null;
 const $  = (id) => document.getElementById(id);
 const mobileMenuBtn       = $('mobileMenuBtn');
 const appSidebar          = $('appSidebar');
+const sidebarBackdrop     = $('sidebarBackdrop');
 const globalSearchInput   = $('globalSearchInput');
 const searchClearBtn      = $('searchClearBtn');
 const userAvatarBtn       = $('userAvatarBtn');
@@ -1945,8 +1946,16 @@ viewGridBtn?.addEventListener('click', () => setViewMode('grid'));
 viewListBtn?.addEventListener('click', () => setViewMode('list'));
 setViewMode(currentViewMode);
 
-// Mobile sidebar hamburger
+// Mobile sidebar hamburger and zero-delay backdrop dismissal
+function closeMobileSidebar() {
+  appSidebar?.classList.remove('open');
+}
+
 mobileMenuBtn?.addEventListener('click', () => appSidebar?.classList.toggle('open'));
+sidebarBackdrop?.addEventListener('click', closeMobileSidebar);
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') closeMobileSidebar();
+});
 
 // User avatar dropdown toggle
 userAvatarBtn?.addEventListener('click', (e) => {
