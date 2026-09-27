@@ -45,8 +45,10 @@ service cloud.firestore {
       allow update: if isAdmin() || (isVerifiedOwner(userId) &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'name', 'displayName', 'email', 'photoURL', 'lastLogin',
-          'storageUsedBytes', 'usedStorageBytes', 'storageUsed', 'updatedAt'
-        ]));
+          'storageUsedBytes', 'usedStorageBytes', 'storageUsed', 'updatedAt', 'fcmToken'
+        ]) &&
+        (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['fcmToken']) ||
+          request.resource.data.fcmToken is string));
       // Referral reward updates must be exact five-gigabyte increments.
       allow update: if isVerifiedOwner(userId) &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly([

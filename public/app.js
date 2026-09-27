@@ -67,6 +67,8 @@ import {
   firebase
 } from './firebase-config.js';
 
+import { getMessaging, getToken, onMessage, isSupported as isMessagingSupported } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js';
+
 // ── Platform Configuration & Cloudinary Credentials ───────────────────────────
 export const CLOUD_NAME = "t3dkhv0z";
 export const UPLOAD_PRESET = "zulora_preset";
@@ -95,6 +97,8 @@ let notificationsUnsubscribe = null;
 let notificationItems = [];
 let notificationSeenIds = new Set();
 let notificationUserUid = null;
+let messagingInstance = null;
+let messagingForegroundUnsubscribe = null;
 let filesSubscriptionGeneration = 0;
 let queuedFileDocs = null;
 let renderFrameId = null;
@@ -960,6 +964,7 @@ function initAuthLifecycle() {
     hideUnverifiedBanner();
     setAuthStateUI(true);
     subscribeGlobalNotifications(user);
+    registerMessagingForUser(user);
     await sendWelcomeEmailOnce(user);
 
     // Immediate UI placeholder until Firestore loads
@@ -982,6 +987,42 @@ function initAuthLifecycle() {
     updateStorageUI(profile);
     subscribeUserFiles(user);
   });
+}
+
+async function registerMessagingForUser(user) {
+  if (!user?.uid || !('Notification' in window) || !('serviceWorker' in navigator)) return;
+
+  try {
+    const supported = await isMessagingSupported();
+    if (!supported) {
+      console.info('[Zulora Messaging] Push messaging is not supported in this browser or webview.');
+      return;
+    }
+
+    let permission = Notification.permission;
+    if (permission === 'default') permission = await Notification.requestPermission();
+    if (permission !== 'granted') return;
+
+    const serviceWorkerRegistration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+    messagingInstance ||= getMessaging(auth.app);
+
+    if (!messagingForegroundUnsubscribe) {
+      messagingForegroundUnsubscribe = onMessage(messagingInstance, (payload) => {
+        const title = payload.notification?.title || payload.data?.title || 'Zulora notification';
+        const body = payload.notification?.body || payload.data?.body || payload.data?.message || 'You have a new update.';
+        showToast(`${title}: ${body}`);
+      });
+    }
+
+    // Firebase uses its default Web Push key unless a project-specific VAPID key is configured.
+    const token = await getToken(messagingInstance, { serviceWorkerRegistration });
+    if (!token) return;
+
+    await setDoc(doc(db, 'users', user.uid), { fcmToken: token }, { merge: true });
+  } catch (err) {
+    // Push setup must never block access to the drive when unsupported or misconfigured.
+    console.warn('[Zulora Messaging] Token registration notice:', err.message);
+  }
 }
 
 
