@@ -62,6 +62,7 @@ import {
   increment,
   query,
   orderBy,
+  limit,
   onSnapshot,
   firebase
 } from './firebase-config.js';
@@ -90,6 +91,10 @@ let selectedFile    = null;
 let activePlan      = null;
 let profile         = null;
 let filesUnsubscribe = null;
+let notificationsUnsubscribe = null;
+let notificationItems = [];
+let notificationSeenIds = new Set();
+let notificationUserUid = null;
 let filesSubscriptionGeneration = 0;
 let queuedFileDocs = null;
 let renderFrameId = null;
@@ -191,6 +196,11 @@ const adminTotalStorage   = $('adminTotalStorage');
 const adminUsersTableBody = $('adminUsersTableBody');
 const fileContextMenu     = $('fileContextMenu');
 const toastNotification   = $('toastNotification');
+const notificationBellBtn = $('notificationBellBtn');
+const notificationDropdown = $('notificationDropdown');
+const notificationList = $('notificationList');
+const notificationUnreadBadge = $('notificationUnreadBadge');
+const notificationCountLabel = $('notificationCountLabel');
 
 // ══════════════════════════════════════════════════════════════════════════════
 // FORMATTING HELPERS & NOTIFICATIONS
@@ -442,6 +452,132 @@ function subscribeUserFiles(currentUser) {
     console.error("[Zulora Files] subscribeUserFiles error:", err);
   }
 }
+
+function notificationSeenStorageKey(uid) {
+  return `zulora_seen_notifications_${uid}`;
+}
+
+function loadSeenNotifications(uid) {
+  try {
+    const savedIds = JSON.parse(localStorage.getItem(notificationSeenStorageKey(uid)) || '[]');
+    return new Set(Array.isArray(savedIds) ? savedIds : []);
+  } catch (_) {
+    return new Set();
+  }
+}
+
+function saveSeenNotifications() {
+  if (!notificationUserUid) return;
+  try {
+    localStorage.setItem(notificationSeenStorageKey(notificationUserUid), JSON.stringify([...notificationSeenIds]));
+  } catch (_) {
+    // Keep the current session usable when browser storage is unavailable.
+  }
+}
+
+function formatNotificationDate(timestamp) {
+  const date = timestamp?.toDate ? timestamp.toDate() : timestamp ? new Date(timestamp) : null;
+  if (!date || Number.isNaN(date.getTime())) return 'Just now';
+  return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(date);
+}
+
+function renderGlobalNotifications() {
+  if (!notificationList) return;
+  notificationList.replaceChildren();
+
+  const unreadCount = notificationItems.reduce((count, item) => count + (notificationSeenIds.has(item.id) ? 0 : 1), 0);
+  if (notificationUnreadBadge) {
+    notificationUnreadBadge.hidden = unreadCount === 0;
+    notificationUnreadBadge.textContent = unreadCount > 9 ? '9+' : String(unreadCount);
+    notificationUnreadBadge.setAttribute('aria-label', `${unreadCount} unread notification${unreadCount === 1 ? '' : 's'}`);
+  }
+  if (notificationCountLabel) notificationCountLabel.textContent = `${notificationItems.length} of 5`;
+
+  if (!notificationItems.length) {
+    const emptyState = document.createElement('div');
+    emptyState.className = 'notification-empty-state';
+    emptyState.textContent = 'There are no announcements yet.';
+    notificationList.appendChild(emptyState);
+    return;
+  }
+
+  notificationItems.forEach((item) => {
+    const card = document.createElement('article');
+    card.className = `notification-card${notificationSeenIds.has(item.id) ? '' : ' is-unread'}`;
+
+    const marker = document.createElement('span');
+    marker.className = 'notification-unread-marker';
+    marker.setAttribute('aria-hidden', 'true');
+
+    const content = document.createElement('div');
+    content.className = 'notification-card-content';
+    const meta = document.createElement('div');
+    meta.className = 'notification-card-meta';
+    const type = document.createElement('span');
+    type.className = `notification-type notification-type-${item.type === 'update' ? 'update' : 'announcement'}`;
+    type.textContent = item.type === 'update' ? 'Update' : 'Announcement';
+    const date = document.createElement('time');
+    date.textContent = formatNotificationDate(item.timestamp);
+    meta.append(type, date);
+
+    const title = document.createElement('h3');
+    title.textContent = item.title || 'Zulora announcement';
+    const message = document.createElement('p');
+    message.textContent = item.message || '';
+    content.append(meta, title, message);
+    card.append(marker, content);
+    notificationList.appendChild(card);
+  });
+}
+
+function subscribeGlobalNotifications(currentUser) {
+  if (typeof notificationsUnsubscribe === 'function') notificationsUnsubscribe();
+  notificationsUnsubscribe = null;
+  notificationUserUid = currentUser?.uid || null;
+  notificationItems = [];
+  notificationSeenIds = notificationUserUid ? loadSeenNotifications(notificationUserUid) : new Set();
+  renderGlobalNotifications();
+  if (!currentUser?.uid) return;
+
+  const notificationsQuery = query(collection(db, 'notifications'), orderBy('timestamp', 'desc'), limit(5));
+  notificationsUnsubscribe = onSnapshot(notificationsQuery, (snapshot) => {
+    notificationItems = snapshot.docs.map((notificationDoc) => ({ id: notificationDoc.id, ...notificationDoc.data() }));
+    renderGlobalNotifications();
+  }, (err) => {
+    console.error('[Zulora Notifications] Listener error:', err);
+    if (notificationList) {
+      notificationList.replaceChildren();
+      const errorState = document.createElement('div');
+      errorState.className = 'notification-empty-state';
+      errorState.textContent = 'Announcements could not be loaded. Please try again later.';
+      notificationList.appendChild(errorState);
+    }
+  });
+}
+
+function setNotificationsOpen(open) {
+  if (!notificationBellBtn || !notificationDropdown) return;
+  notificationDropdown.classList.toggle('show', open);
+  notificationDropdown.setAttribute('aria-hidden', String(!open));
+  notificationBellBtn.setAttribute('aria-expanded', String(open));
+  if (open) {
+    notificationItems.forEach((item) => notificationSeenIds.add(item.id));
+    saveSeenNotifications();
+    renderGlobalNotifications();
+  }
+}
+
+notificationBellBtn?.addEventListener('click', () => {
+  setNotificationsOpen(!notificationDropdown?.classList.contains('show'));
+});
+
+document.addEventListener('click', (event) => {
+  if (!event.target.closest('.notification-menu-wrapper')) setNotificationsOpen(false);
+});
+
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') setNotificationsOpen(false);
+});
 
 /**
  * Normalizes and populates file records, applies filters and updates view
@@ -794,6 +930,13 @@ function initAuthLifecycle() {
         filesUnsubscribe = null;
         filesSubscriptionGeneration++;
       }
+      if (typeof notificationsUnsubscribe === 'function') notificationsUnsubscribe();
+      notificationsUnsubscribe = null;
+      notificationUserUid = null;
+      notificationItems = [];
+      notificationSeenIds = new Set();
+      renderGlobalNotifications();
+      setNotificationsOpen(false);
       setAuthStateUI(false);
       return;
     }
@@ -803,6 +946,12 @@ function initAuthLifecycle() {
     // Email/Password accounts that haven't clicked the verification link are
     // shown a persistent banner and denied access to storage and file ops.
     if (!user.emailVerified) {
+      if (typeof notificationsUnsubscribe === 'function') notificationsUnsubscribe();
+      notificationsUnsubscribe = null;
+      notificationUserUid = null;
+      notificationItems = [];
+      notificationSeenIds = new Set();
+      renderGlobalNotifications();
       showUnverifiedBanner(user);
       return; // Do NOT proceed to dashboard setup, file subscription, or bootstrapUser
     }
@@ -810,6 +959,7 @@ function initAuthLifecycle() {
     // ── Verified user — full dashboard access ─────────────────────────────────
     hideUnverifiedBanner();
     setAuthStateUI(true);
+    subscribeGlobalNotifications(user);
     await sendWelcomeEmailOnce(user);
 
     // Immediate UI placeholder until Firestore loads

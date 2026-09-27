@@ -117,6 +117,24 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
+    // Global announcements are readable by verified accounts and managed by admins.
+    match /notifications/{notificationId} {
+      allow read: if isEmailVerified();
+      allow create: if isAdmin() &&
+        request.resource.data.keys().hasOnly(['title', 'message', 'timestamp', 'type']) &&
+        request.resource.data.title is string &&
+        request.resource.data.message is string &&
+        request.resource.data.timestamp is timestamp &&
+        request.resource.data.type in ['announcement', 'update'];
+      allow update: if isAdmin() &&
+        request.resource.data.keys().hasOnly(['title', 'message', 'timestamp', 'type']) &&
+        request.resource.data.title is string &&
+        request.resource.data.message is string &&
+        request.resource.data.timestamp is timestamp &&
+        request.resource.data.type in ['announcement', 'update'];
+      allow delete: if isAdmin();
+    }
+
     // Upgrade payment requests
 
     // ── Upgrade Payment Requests ──────────────────────────────────────────────
@@ -129,4 +147,3 @@ service cloud.firestore {
 
   }
 }
-

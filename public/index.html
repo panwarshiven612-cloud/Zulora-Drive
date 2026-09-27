@@ -469,6 +469,25 @@
           <span>Upgrade</span>
         </button>
 
+        <div class="notification-menu-wrapper">
+          <button id="notificationBellBtn" class="notification-bell-btn" type="button" title="Notifications" aria-label="Notifications" aria-haspopup="true" aria-expanded="false" aria-controls="notificationDropdown">
+            <i class="fa-regular fa-bell" aria-hidden="true"></i>
+            <span id="notificationUnreadBadge" class="notification-unread-badge" hidden aria-label="Unread notifications">0</span>
+          </button>
+          <section id="notificationDropdown" class="notification-dropdown" aria-label="Global announcements" aria-hidden="true">
+            <div class="notification-dropdown-header">
+              <div>
+                <h2>Notifications</h2>
+                <p>Global announcements and updates</p>
+              </div>
+              <span id="notificationCountLabel" class="notification-count-label">Latest 5</span>
+            </div>
+            <div id="notificationList" class="notification-list" aria-live="polite">
+              <div class="notification-empty-state">Loading announcements…</div>
+            </div>
+          </section>
+        </div>
+
         <div class="user-menu-wrapper">
           <button id="userAvatarBtn" class="user-avatar-btn" title="Account settings">
             <span id="userInitials">Z</span>
