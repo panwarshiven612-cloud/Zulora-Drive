@@ -71,6 +71,18 @@ function requireAdminToken(req, res, next) {
   next();
 }
 
+async function requireFirebaseUser(req, res, next) {
+  const match = /^Bearer\s+(.+)$/i.exec(req.headers.authorization || '');
+  if (!match) return res.status(401).json({ error: 'Firebase sign-in is required.' });
+
+  try {
+    req.firebaseUser = await admin.auth().verifyIdToken(match[1]);
+    next();
+  } catch (err) {
+    return res.status(401).json({ error: 'Invalid or expired Firebase sign-in.' });
+  }
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // ROUTES
 // ══════════════════════════════════════════════════════════════════════════════
@@ -86,6 +98,29 @@ app.get('/health', (req, res) => {
     version:   '1.0.0',
     timestamp: new Date().toISOString()
   });
+});
+
+/**
+ * POST /fcm/subscribe-topic
+ * Add the authenticated user's FCM registration token to an FCM topic.
+ * Body: { token: string, topic: 'all_users' }
+ */
+app.post('/fcm/subscribe-topic', requireFirebaseUser, async (req, res) => {
+  const { token, topic } = req.body || {};
+  if (typeof token !== 'string' || token.length < 20 || topic !== 'all_users') {
+    return res.status(400).json({ error: 'A valid FCM token and the all_users topic are required.' });
+  }
+  if (!serviceAccount) {
+    return res.status(503).json({ error: 'FCM topic enrollment is unavailable until backend credentials are configured.' });
+  }
+
+  try {
+    const result = await admin.messaging().subscribeToTopic(token, topic);
+    res.json({ success: true, topic, failures: result.failureCount });
+  } catch (err) {
+    console.error('[Zulora API] FCM topic subscription error:', err.message);
+    res.status(500).json({ error: 'Unable to subscribe this device to push notifications.' });
+  }
 });
 
 /**
@@ -222,4 +257,3 @@ app.listen(PORT, () => {
 });
 
 module.exports = app;
-

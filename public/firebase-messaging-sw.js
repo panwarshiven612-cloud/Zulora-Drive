@@ -38,7 +38,7 @@ messaging.onBackgroundMessage((payload) => {
   const body = payload.data?.body || payload.data?.message || 'You have a new update.';
   return self.registration.showNotification(title, {
     body,
-    icon: '/logo.svg',
+    icon: payload.data?.image || 'https://i.postimg.cc/50xrjRk4/1790093390751.png',
     badge: '/logo.svg',
     data: { url: payload.data?.url || '/' }
   });

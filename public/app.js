@@ -69,6 +69,8 @@ import {
 
 import { getMessaging, getToken, onMessage, isSupported as isMessagingSupported } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js';
 
+const FCM_VAPID_KEY = 'BKjuA0s21usKnrh2SEeBgbgsri7UnnWR_1EhadwEZ3dN3q6_kQ2a8Ng3uZE-fi7VdBIcd97oTIR1GpUmW58eocs';
+
 // ── Platform Configuration & Cloudinary Credentials ───────────────────────────
 export const CLOUD_NAME = "t3dkhv0z";
 export const UPLOAD_PRESET = "zulora_preset";
@@ -1014,11 +1016,28 @@ async function registerMessagingForUser(user) {
       });
     }
 
-    // Firebase uses its default Web Push key unless a project-specific VAPID key is configured.
-    const token = await getToken(messagingInstance, { serviceWorkerRegistration });
+    const token = await getToken(messagingInstance, {
+      vapidKey: FCM_VAPID_KEY,
+      serviceWorkerRegistration
+    });
     if (!token) return;
 
     await setDoc(doc(db, 'users', user.uid), { fcmToken: token }, { merge: true });
+
+    // Topic membership must be managed with the Admin SDK, never a server key in the browser.
+    const apiBaseUrl = window.ZULORA_API_BASE_URL;
+    if (apiBaseUrl) {
+      const idToken = await user.getIdToken();
+      const response = await fetch(`${apiBaseUrl.replace(/\/$/, '')}/fcm/subscribe-topic`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${idToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ token, topic: 'all_users' })
+      });
+      if (!response.ok) throw new Error(`Topic subscription failed (${response.status}).`);
+    }
   } catch (err) {
     // Push setup must never block access to the drive when unsupported or misconfigured.
     console.warn('[Zulora Messaging] Token registration notice:', err.message);
